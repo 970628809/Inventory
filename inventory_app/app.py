@@ -16,6 +16,7 @@ OPERATION_LABELS = {
     "inbound": "入庫",
     "outbound": "出庫",
     "adjustment": "棚卸",
+    "modification": "修正",
 }
 
 PRODUCT_COLUMNS = {
@@ -405,7 +406,7 @@ def excel_import():
 @app.route("/stock/operate/<int:product_id>", methods=["GET", "POST"])
 def stock_operate(product_id):
     operation_type = request.args.get("type", "inbound")
-    if operation_type not in ["inbound", "outbound", "adjustment"]:
+    if operation_type not in ["inbound", "outbound", "adjustment", "modification"]:
         operation_type = "inbound"
 
     conn = get_db_connection()
@@ -436,6 +437,13 @@ def stock_operate(product_id):
                 change = actual_quantity - current_stock
                 quantity = change
                 new_stock = actual_quantity
+        elif operation_type == "modification":
+            new_stock = request.form.get("new_stock", type=int)
+            if new_stock is None or new_stock < 0:
+                error_message = "正しい新在庫数を入力してください。"
+            else:
+                change = new_stock - current_stock
+                quantity = change
         else:
             quantity = request.form.get("quantity", type=int)
             if quantity is None or quantity < 0:

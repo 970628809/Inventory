@@ -4,56 +4,108 @@
   <p class="text-muted">在庫の状態を簡単に確認できます。</p>
 
   <div class="row gy-4">
+    <!-- 在庫 0 商品 -->
     <div class="col-md-4">
       <div class="card border-danger h-100">
-        <div class="card-body">
-          <h5 class="card-title">在庫 0 商品</h5>
-          <p class="card-text">現在在庫が 0 の商品です。</p>
-          {% if zero_stock %}
-            <ul class="list-group list-group-flush">
-              {% for product in zero_stock %}
-                <li class="list-group-item">{{ product.sku }} - {{ product.name }}</li>
-              {% endfor %}
-            </ul>
-          {% else %}
-            <p class="text-success">該当なし</p>
-          {% endif %}
+        <div class="card-header bg-danger bg-opacity-10 cursor-pointer" data-bs-toggle="collapse" data-bs-target="#zeroStockCollapse">
+          <h5 class="card-title mb-0 d-flex justify-content-between align-items-center">
+            <span>在庫 0 商品</span>
+            <small class="badge bg-danger">{{ zero_stock|length }}</small>
+          </h5>
+        </div>
+        <div id="zeroStockCollapse" class="collapse show">
+          <div class="card-body p-0">
+            {% if zero_stock %}
+              <div class="list-group list-group-flush">
+                {% for product in zero_stock %}
+                  <a href="{{ url_for('stock_operate', product_id=product.id, type='inbound') }}" class="list-group-item list-group-item-action">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <div>
+                        <strong>{{ product.sku }}</strong> - {{ product.name }}
+                        <br><small class="text-muted">{{ product.big_category }}</small>
+                      </div>
+                      <span class="badge bg-danger">入庫</span>
+                    </div>
+                  </a>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="card-body text-success text-center">
+                <i class="bi bi-check-circle"></i> 該当なし
+              </div>
+            {% endif %}
+          </div>
         </div>
       </div>
     </div>
 
+    <!-- 低在庫商品 -->
     <div class="col-md-4">
       <div class="card border-warning h-100">
-        <div class="card-body">
-          <h5 class="card-title">低在庫商品</h5>
-          <p class="card-text">在庫が発注点以下の商品です。</p>
-          {% if low_stock %}
-            <ul class="list-group list-group-flush">
-              {% for product in low_stock %}
-                <li class="list-group-item">{{ product.sku }} - {{ product.name }} ({{ product.current_stock }})</li>
-              {% endfor %}
-            </ul>
-          {% else %}
-            <p class="text-success">該当なし</p>
-          {% endif %}
+        <div class="card-header bg-warning bg-opacity-10 cursor-pointer" data-bs-toggle="collapse" data-bs-target="#lowStockCollapse">
+          <h5 class="card-title mb-0 d-flex justify-content-between align-items-center">
+            <span>低在庫商品</span>
+            <small class="badge bg-warning">{{ low_stock|length }}</small>
+          </h5>
+        </div>
+        <div id="lowStockCollapse" class="collapse show">
+          <div class="card-body p-0">
+            {% if low_stock %}
+              <div class="list-group list-group-flush">
+                {% for product in low_stock %}
+                  <a href="{{ url_for('stock_operate', product_id=product.id, type='inbound') }}" class="list-group-item list-group-item-action">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <div>
+                        <strong>{{ product.sku }}</strong> - {{ product.name }}
+                        <br><small class="text-muted">{{ product.big_category }} | 在庫: <strong>{{ product.current_stock }}</strong></small>
+                      </div>
+                      <span class="badge bg-warning">{{ product.current_stock }}</span>
+                    </div>
+                  </a>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="card-body text-success text-center">
+                <i class="bi bi-check-circle"></i> 該当なし
+              </div>
+            {% endif %}
+          </div>
         </div>
       </div>
     </div>
 
+    <!-- 不動在庫商品 -->
     <div class="col-md-4">
       <div class="card border-info h-100">
-        <div class="card-body">
-          <h5 class="card-title">不動在庫商品</h5>
-          <p class="card-text">30 日以上出庫がない商品です。</p>
-          {% if stagnant_stock %}
-            <ul class="list-group list-group-flush">
-              {% for product in stagnant_stock %}
-                <li class="list-group-item">{{ product.sku }} - {{ product.name }} (最終出庫: {{ product.last_out_date }})</li>
-              {% endfor %}
-            </ul>
-          {% else %}
-            <p class="text-success">該当なし</p>
-          {% endif %}
+        <div class="card-header bg-info bg-opacity-10 cursor-pointer" data-bs-toggle="collapse" data-bs-target="#stagnantStockCollapse">
+          <h5 class="card-title mb-0 d-flex justify-content-between align-items-center">
+            <span>不動在庫商品</span>
+            <small class="badge bg-info">{{ stagnant_stock|length }}</small>
+          </h5>
+        </div>
+        <div id="stagnantStockCollapse" class="collapse show">
+          <div class="card-body p-0">
+            <small class="d-block px-3 pt-2 text-muted">30日以上出庫がありません</small>
+            {% if stagnant_stock %}
+              <div class="list-group list-group-flush">
+                {% for product in stagnant_stock %}
+                  <a href="{{ url_for('stock_operate', product_id=product.id, type='outbound') }}" class="list-group-item list-group-item-action">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <div>
+                        <strong>{{ product.sku }}</strong> - {{ product.name }}
+                        <br><small class="text-muted">最終出庫: {{ product.last_out_date }}</small>
+                      </div>
+                      <span class="badge bg-info">出庫</span>
+                    </div>
+                  </a>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="card-body text-success text-center">
+                <i class="bi bi-check-circle"></i> 該当なし
+              </div>
+            {% endif %}
+          </div>
         </div>
       </div>
     </div>
@@ -62,34 +114,59 @@
   <section class="mt-5">
     <h2>最近の在庫変動</h2>
     {% if recent_logs %}
-      <table class="table table-sm table-striped">
-        <thead>
-          <tr>
-            <th>日時</th>
-            <th>品番</th>
-            <th>商品名</th>
-            <th>操作</th>
-            <th>数量</th>
-            <th>担当</th>
-            <th>メモ</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for log in recent_logs %}
+      <div class="table-responsive">
+        <table class="table table-sm table-striped align-middle">
+          <thead class="table-dark sticky-top">
             <tr>
-              <td>{{ log.created_at }}</td>
-              <td>{{ log.sku }}</td>
-              <td>{{ log.name }}</td>
-              <td>{{ operation_labels[log.operation_type] if log.operation_type in operation_labels else log.operation_type }}</td>
-              <td>{{ log.quantity }}</td>
-              <td>{{ log.staff_name }}</td>
-              <td>{{ log.note }}</td>
+              <th class="text-center">日時</th>
+              <th>品番</th>
+              <th>商品名</th>
+              <th class="text-center">操作</th>
+              <th class="text-center">数量</th>
+              <th>担当</th>
+              <th>メモ</th>
             </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {% for log in recent_logs %}
+              <tr>
+                <td class="text-center"><small>{{ log.created_at }}</small></td>
+                <td><code>{{ log.sku }}</code></td>
+                <td><strong>{{ log.name }}</strong></td>
+                <td class="text-center">
+                  {% if log.operation_type == 'inbound' %}
+                    <span class="badge bg-success">{{ operation_labels[log.operation_type] if log.operation_type in operation_labels else log.operation_type }}</span>
+                  {% elif log.operation_type == 'outbound' %}
+                    <span class="badge bg-danger">{{ operation_labels[log.operation_type] if log.operation_type in operation_labels else log.operation_type }}</span>
+                  {% elif log.operation_type == 'adjustment' %}
+                    <span class="badge bg-warning">{{ operation_labels[log.operation_type] if log.operation_type in operation_labels else log.operation_type }}</span>
+                  {% elif log.operation_type == 'modification' %}
+                    <span class="badge bg-info">{{ operation_labels[log.operation_type] if log.operation_type in operation_labels else log.operation_type }}</span>
+                  {% else %}
+                    <span class="badge bg-secondary">{{ operation_labels[log.operation_type] if log.operation_type in operation_labels else log.operation_type }}</span>
+                  {% endif %}
+                </td>
+                <td class="text-center"><strong>{{ log.quantity }}</strong></td>
+                <td><small>{{ log.staff_name }}</small></td>
+                <td><small>{{ log.note }}</small></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     {% else %}
-      <p>まだ在庫変動の記録がありません。</p>
+      <div class="alert alert-info" role="alert">
+        <i class="bi bi-info-circle"></i> まだ在庫変動の記録がありません。
+      </div>
     {% endif %}
   </section>
+
+  <style>
+    .cursor-pointer {
+      cursor: pointer;
+    }
+    .card-header:hover {
+      background-color: rgba(0, 0, 0, 0.05) !important;
+    }
+  </style>
 {% endblock %}

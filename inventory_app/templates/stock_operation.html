@@ -19,6 +19,11 @@
         <label class="form-label">実際在庫数</label>
         <input type="number" name="actual_quantity" class="form-control" min="0" required>
       </div>
+    {% elif operation_type in ['modification', 'delete'] %}
+      <div class="col-md-6">
+        <label class="form-label">新在庫数</label>
+        <input type="number" name="new_stock" class="form-control" min="0" required>
+      </div>
     {% else %}
       <div class="col-md-6">
         <label class="form-label">数量</label>
@@ -32,7 +37,7 @@
     </div>
     <div class="col-md-6">
       <label class="form-label">メモ</label>
-      <input type="text" name="note" class="form-control" placeholder="例: 入荷、販売、棚卸調整">
+      <input type="text" name="note" class="form-control" placeholder="例: 入荷、販売、棚卸調整、修正、削除">
     </div>
 
     <div class="col-12">
