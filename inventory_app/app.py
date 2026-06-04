@@ -1,8 +1,10 @@
+import json
 import os
 from flask import Flask, render_template, request, redirect, url_for, flash
 import sqlite3
 from pathlib import Path
 from datetime import datetime, timedelta
+from openpyxl import load_workbook
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "inventory.db"
@@ -15,6 +17,51 @@ OPERATION_LABELS = {
     "outbound": "出庫",
     "adjustment": "棚卸",
 }
+
+PRODUCT_COLUMNS = {
+    "source_sheet": "TEXT",
+    "source_row": "INTEGER",
+    "big_category": "TEXT",
+    "maker_or_product": "TEXT",
+    "overview": "TEXT",
+    "stock_status": "TEXT",
+    "display_flag": "TEXT",
+    "available_stock": "INTEGER NOT NULL DEFAULT 0",
+    "total_stock": "INTEGER NOT NULL DEFAULT 0",
+    "staff_stock_json": "TEXT",
+    "imported_at": "TEXT",
+}
+
+
+def ensure_product_columns(conn):
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA table_info(products)")
+    existing_columns = {row[1] for row in cursor.fetchall()}
+    for name, definition in PRODUCT_COLUMNS.items():
+        if name not in existing_columns:
+            cursor.execute(f"ALTER TABLE products ADD COLUMN {name} {definition}")
+    conn.commit()
+
+
+def ensure_database():
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='products'")
+        if cursor.fetchone():
+            ensure_product_columns(conn)
+        else:
+            conn.close()
+            conn = None
+            from init_db import create_db
+            create_db()
+            return
+    finally:
+        if conn:
+            conn.close()
+
+
+ensure_database()
 
 
 def get_db_connection():
@@ -37,17 +84,17 @@ def build_product_query(params):
     values = []
 
     if params["q"]:
-        sql += " AND (name LIKE ? OR sku LIKE ?)"
+        sql += " AND (name LIKE ? OR sku LIKE ? OR big_category LIKE ? OR maker_or_product LIKE ? OR overview LIKE ? OR notes LIKE ? OR source_sheet LIKE ? OR category LIKE ? OR location LIKE ? OR staff_stock_json LIKE ? )"
         term = f"%{params['q']}%"
-        values.extend([term, term])
+        values.extend([term] * 10)
 
     if params["sku"]:
         sql += " AND sku LIKE ?"
         values.append(f"%{params['sku']}%")
 
     if params["category"]:
-        sql += " AND category LIKE ?"
-        values.append(f"%{params['category']}%")
+        sql += " AND (category LIKE ? OR big_category LIKE ?)"
+        values.extend([f"%{params['category']}%", f"%{params['category']}%"])
 
     if params["location"]:
         sql += " AND location LIKE ?"
@@ -57,6 +104,216 @@ def build_product_query(params):
     return sql, values
 
 
+def parse_int(value):
+    if value is None:
+        return 0
+    if isinstance(value, str):
+        value = value.strip().replace(",", "")
+    try:
+        return int(value)
+    except Exception:
+        try:
+            return int(float(value))
+        except Exception:
+            return 0
+
+
+def get_cell(sheet, row, col):
+    value = sheet.cell(row=row, column=col).value
+    return value if value is not None else ""
+
+
+def parse_staff_stock(sheet, row):
+    values = {}
+    for col in range(13, 27):
+        header = sheet.cell(row=2, column=col).value
+        if header is None:
+            continue
+        header = str(header).strip()
+        if not header:
+            continue
+        cell_value = sheet.cell(row=row, column=col).value
+        stock = parse_int(cell_value)
+        values[header] = stock
+    return values
+
+
+NORMAL_SHEETS = {
+    "エアコン在庫": "エアコン",
+    "給湯器在庫": "給湯器",
+    "トイレ在庫": "トイレ",
+    "その他設備在庫": None,
+    "その他家電在庫": None,
+}
+
+
+def parse_inventory_row(sheet, sheet_name, row):
+    if sheet_name in NORMAL_SHEETS:
+        reorder_point = parse_int(get_cell(sheet, row, 2))
+        stock_status = str(get_cell(sheet, row, 3)).strip()
+        maker_or_product = str(get_cell(sheet, row, 4)).strip()
+        overview = str(get_cell(sheet, row, 5)).strip()
+        sku = str(get_cell(sheet, row, 6)).strip()
+        display_flag = str(get_cell(sheet, row, 7)).strip()
+        available_stock = parse_int(get_cell(sheet, row, 8))
+        total_stock = parse_int(get_cell(sheet, row, 12))
+        notes = str(get_cell(sheet, row, 27)).strip()
+        staff_stock = parse_staff_stock(sheet, row)
+
+        if not sku and not maker_or_product and not overview:
+            return None
+
+        if NORMAL_SHEETS[sheet_name] is None:
+            big_category = maker_or_product
+        else:
+            big_category = NORMAL_SHEETS[sheet_name]
+
+        name = maker_or_product or sku or overview or "不明"
+        return {
+            "source_sheet": sheet_name,
+            "source_row": row,
+            "big_category": big_category,
+            "maker_or_product": maker_or_product,
+            "overview": overview,
+            "sku": sku,
+            "stock_status": stock_status,
+            "display_flag": display_flag,
+            "available_stock": available_stock,
+            "total_stock": total_stock,
+            "reorder_point": reorder_point,
+            "staff_stock_json": json.dumps(staff_stock, ensure_ascii=False),
+            "notes": notes,
+            "imported_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "current_stock": available_stock,
+            "name": name,
+            "category": big_category,
+            "location": "",
+        }
+    if sheet_name == "魚倉庫在庫":
+        reorder_point = parse_int(get_cell(sheet, row, 2))
+        stock_status = str(get_cell(sheet, row, 3)).strip()
+        available_stock = parse_int(get_cell(sheet, row, 4))
+        maker_or_product = str(get_cell(sheet, row, 8)).strip()
+        overview = str(get_cell(sheet, row, 7)).strip()
+        sku = str(get_cell(sheet, row, 9)).strip()
+        notes = str(get_cell(sheet, row, 20)).strip()
+        big_category = str(get_cell(sheet, row, 6)).strip()
+
+        if not sku and not overview:
+            return None
+
+        name = maker_or_product or sku or overview or "不明"
+        return {
+            "source_sheet": sheet_name,
+            "source_row": row,
+            "big_category": big_category,
+            "maker_or_product": maker_or_product,
+            "overview": overview,
+            "sku": sku,
+            "stock_status": stock_status,
+            "display_flag": "",
+            "available_stock": available_stock,
+            "total_stock": 0,
+            "reorder_point": reorder_point,
+            "staff_stock_json": json.dumps({}, ensure_ascii=False),
+            "notes": notes,
+            "imported_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "current_stock": available_stock,
+            "name": name,
+            "category": big_category,
+            "location": "",
+        }
+    return None
+
+
+def import_excel_file(file_stream):
+    workbook = load_workbook(filename=file_stream, data_only=True)
+    sheet_names = [name for name in workbook.sheetnames if workbook[name].sheet_state == "visible"]
+    imported = 0
+    skipped = 0
+    errors = 0
+    error_details = []
+    conn = get_db_connection()
+
+    for sheet_name in sheet_names:
+        if sheet_name not in list(NORMAL_SHEETS.keys()) + ["魚倉庫在庫"]:
+            continue
+        sheet = workbook[sheet_name]
+        for row in range(4, sheet.max_row + 1):
+            try:
+                record = parse_inventory_row(sheet, sheet_name, row)
+                if record is None:
+                    skipped += 1
+                    continue
+                existing = conn.execute(
+                    "SELECT id FROM products WHERE source_sheet = ? AND source_row = ?",
+                    (record["source_sheet"], record["source_row"]),
+                ).fetchone()
+                if existing:
+                    conn.execute(
+                        "UPDATE products SET big_category = ?, maker_or_product = ?, overview = ?, sku = ?, stock_status = ?, display_flag = ?, available_stock = ?, total_stock = ?, reorder_point = ?, staff_stock_json = ?, notes = ?, imported_at = ?, current_stock = ?, name = ?, category = ?, location = ?, updated_at = ? WHERE source_sheet = ? AND source_row = ?",
+                        (
+                            record["big_category"],
+                            record["maker_or_product"],
+                            record["overview"],
+                            record["sku"],
+                            record["stock_status"],
+                            record["display_flag"],
+                            record["available_stock"],
+                            record["total_stock"],
+                            record["reorder_point"],
+                            record["staff_stock_json"],
+                            record["notes"],
+                            record["imported_at"],
+                            record["current_stock"],
+                            record["name"],
+                            record["category"],
+                            record["location"],
+                            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            record["source_sheet"],
+                            record["source_row"],
+                        ),
+                    )
+                else:
+                    conn.execute(
+                        "INSERT INTO products (source_sheet, source_row, big_category, maker_or_product, overview, sku, stock_status, display_flag, available_stock, total_stock, reorder_point, staff_stock_json, notes, imported_at, current_stock, name, category, location, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (
+                            record["source_sheet"],
+                            record["source_row"],
+                            record["big_category"],
+                            record["maker_or_product"],
+                            record["overview"],
+                            record["sku"],
+                            record["stock_status"],
+                            record["display_flag"],
+                            record["available_stock"],
+                            record["total_stock"],
+                            record["reorder_point"],
+                            record["staff_stock_json"],
+                            record["notes"],
+                            record["imported_at"],
+                            record["current_stock"],
+                            record["name"],
+                            record["category"],
+                            record["location"],
+                            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        ),
+                    )
+                imported += 1
+            except Exception as exc:
+                errors += 1
+                error_details.append(f"{sheet_name} 行 {row}: {exc}")
+    conn.commit()
+    conn.close()
+    return {
+        "imported": imported,
+        "skipped": skipped,
+        "errors": errors,
+        "error_details": error_details,
+    }
+
+
 @app.route("/")
 def dashboard():
     conn = get_db_connection()
@@ -64,11 +321,11 @@ def dashboard():
     cutoff = today - timedelta(days=30)
 
     zero_stock = conn.execute(
-        "SELECT * FROM products WHERE current_stock = 0 ORDER BY name"
+        "SELECT * FROM products WHERE available_stock = 0 ORDER BY name"
     ).fetchall()
 
     low_stock = conn.execute(
-        "SELECT * FROM products WHERE current_stock > 0 AND current_stock <= reorder_point ORDER BY current_stock ASC"
+        "SELECT * FROM products WHERE reorder_point > 0 AND available_stock <= reorder_point ORDER BY available_stock ASC"
     ).fetchall()
 
     stagnant_stock = conn.execute(
@@ -103,6 +360,24 @@ def inventory():
         products=products,
         params=params,
     )
+
+
+@app.route("/excel_import", methods=["GET", "POST"])
+def excel_import():
+    result = None
+    if request.method == "POST":
+        uploaded_file = request.files.get("excel_file")
+        if not uploaded_file or uploaded_file.filename == "":
+            flash("Excelファイルを選択してください。", "danger")
+        elif not uploaded_file.filename.lower().endswith(".xlsx"):
+            flash(".xlsxファイルをアップロードしてください。", "danger")
+        else:
+            result = import_excel_file(uploaded_file)
+            if result["errors"] == 0:
+                flash(f"Excel取込が完了しました。{result['imported']}件を登録し、{result['skipped']}件をスキップしました。", "success")
+            else:
+                flash(f"Excel取込が完了しました。{result['imported']}件を登録し、{result['skipped']}件をスキップし、{result['errors']}件のエラーが発生しました。", "danger")
+    return render_template("excel_import.html", result=result)
 
 
 @app.route("/stock/operate/<int:product_id>", methods=["GET", "POST"])

@@ -27,38 +27,38 @@
     <table class="table table-bordered table-hover align-middle">
       <thead class="table-light">
         <tr>
-          <th>SKU</th>
-          <th>商品名</th>
-          <th>カテゴリー</th>
-          <th>保管場所</th>
-          <th>在庫</th>
-          <th>最低在庫</th>
-          <th>最終入庫日</th>
-          <th>最終出庫日</th>
-          <th>状態</th>
+          <th>大分類</th>
+          <th>メーカー/商品</th>
+          <th>概要</th>
+          <th>品番</th>
+          <th>販売可能台数</th>
+          <th>総台数</th>
+          <th>担当者別在庫</th>
+          <th>備考</th>
+          <th>元シート</th>
           <th>操作</th>
         </tr>
       </thead>
       <tbody>
         {% for product in products %}
           {% set status = '' %}
-          {% if product.current_stock == 0 %}
+          {% if product.available_stock == 0 %}
             {% set status = '在庫 0' %}
-          {% elif product.current_stock <= product.reorder_point %}
+          {% elif product.reorder_point > 0 and product.available_stock <= product.reorder_point %}
             {% set status = '低在庫' %}
           {% else %}
             {% set status = '正常' %}
           {% endif %}
           <tr>
+            <td>{{ product.big_category }}</td>
+            <td>{{ product.maker_or_product }}</td>
+            <td>{{ product.overview }}</td>
             <td>{{ product.sku }}</td>
-            <td>{{ product.name }}</td>
-            <td>{{ product.category }}</td>
-            <td>{{ product.location }}</td>
-            <td>{{ product.current_stock }}</td>
-            <td>{{ product.reorder_point }}</td>
-            <td>{{ product.last_in_date or '-' }}</td>
-            <td>{{ product.last_out_date or '-' }}</td>
-            <td>{{ status }}</td>
+            <td>{{ product.available_stock }}</td>
+            <td>{{ product.total_stock }}</td>
+            <td>{{ product.staff_stock_json or '-' }}</td>
+            <td>{{ product.notes }}</td>
+            <td>{{ product.source_sheet }}</td>
             <td>
               <div class="btn-group" role="group">
                 <a href="{{ url_for('stock_operate', product_id=product.id, type='inbound') }}" class="btn btn-sm btn-success">入庫</a>
@@ -66,7 +66,6 @@
                 <a href="{{ url_for('stock_operate', product_id=product.id, type='adjustment') }}" class="btn btn-sm btn-secondary">棚卸</a>
               </div>
             </td>
-          </tr>
         {% else %}
           <tr>
             <td colspan="9" class="text-center">該当する商品が見つかりません。</td>
