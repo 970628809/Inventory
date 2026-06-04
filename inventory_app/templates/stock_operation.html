@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block content %}
   <h1>在庫操作</h1>
-  <p>商品: <strong>{{ product.name }}</strong>（SKU: {{ product.sku }}）</p>
+  <p>商品: <strong>{{ product.name }}</strong>（品番: {{ product.sku }}）</p>
   <p>現在在庫: <strong>{{ product.current_stock }}</strong></p>
 
   {% if error_message %}

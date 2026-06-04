@@ -1,24 +1,35 @@
 {% extends 'base.html' %}
 {% block content %}
   <h1>在庫一覧</h1>
+
+  <!-- 大分類フィルタボタン -->
+  <div class="mb-3">
+    <div class="btn-group" role="group">
+      <a href="{{ url_for('inventory') }}" class="btn btn-sm {% if not params.big_category %}btn-primary{% else %}btn-outline-primary{% endif %}">すべて</a>
+      {% for category in big_categories %}
+        <a href="{{ url_for('inventory', big_category=category, q=params.q, sku=params.sku, location=params.location) }}" class="btn btn-sm {% if params.big_category == category %}btn-primary{% else %}btn-outline-primary{% endif %}">{{ category }}</a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- 検索フォーム -->
   <form method="get" class="row gy-2 gx-2 align-items-end mb-4">
     <div class="col-md-3">
-      <label class="form-label">商品名 / SKU</label>
+      <label class="form-label">商品名 / 品番</label>
       <input type="text" name="q" value="{{ params.q }}" class="form-control" placeholder="検索...">
-    </div>
-    <div class="col-md-2">
-      <label class="form-label">カテゴリー</label>
-      <input type="text" name="category" value="{{ params.category }}" class="form-control" placeholder="カテゴリー">
     </div>
     <div class="col-md-2">
       <label class="form-label">保管場所</label>
       <input type="text" name="location" value="{{ params.location }}" class="form-control" placeholder="棚・倉庫">
     </div>
     <div class="col-md-2">
-      <label class="form-label">SKU</label>
-      <input type="text" name="sku" value="{{ params.sku }}" class="form-control" placeholder="SKU">
+      <label class="form-label">品番</label>
+      <input type="text" name="sku" value="{{ params.sku }}" class="form-control" placeholder="品番">
     </div>
     <div class="col-md-2">
+      {% if params.big_category %}
+        <input type="hidden" name="big_category" value="{{ params.big_category }}">
+      {% endif %}
       <button type="submit" class="btn btn-primary w-100">検索</button>
     </div>
   </form>
@@ -56,7 +67,7 @@
             <td>{{ product.sku }}</td>
             <td>{{ product.available_stock }}</td>
             <td>{{ product.total_stock }}</td>
-            <td>{{ product.staff_stock_json or '-' }}</td>
+            <td>{{ product.staff_stock_json | format_staff_stock }}</td>
             <td>{{ product.notes }}</td>
             <td>{{ product.source_sheet }}</td>
             <td>

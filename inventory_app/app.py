@@ -70,11 +70,32 @@ def get_db_connection():
     return conn
 
 
+def format_staff_stock_display(staff_stock_json):
+    """
+    Filter to display staff stock without zero values.
+    Input: JSON string like '{"A05": 1, "A06": 0, "H12": 2}'
+    Output: "A05: 1 / H12: 2" or "-" if empty or all zeros
+    """
+    if not staff_stock_json:
+        return "-"
+    try:
+        data = json.loads(staff_stock_json)
+        non_zero = {k: v for k, v in data.items() if v != 0}
+        if not non_zero:
+            return "-"
+        return " / ".join([f"{k}: {v}" for k, v in non_zero.items()])
+    except Exception:
+        return "-"
+
+
+app.jinja_env.filters['format_staff_stock'] = format_staff_stock_display
+
+
 def parse_search_args():
     return {
         "q": request.args.get("q", "", type=str).strip(),
         "sku": request.args.get("sku", "", type=str).strip(),
-        "category": request.args.get("category", "", type=str).strip(),
+        "big_category": request.args.get("big_category", "", type=str).strip(),
         "location": request.args.get("location", "", type=str).strip(),
     }
 
@@ -92,9 +113,9 @@ def build_product_query(params):
         sql += " AND sku LIKE ?"
         values.append(f"%{params['sku']}%")
 
-    if params["category"]:
-        sql += " AND (category LIKE ? OR big_category LIKE ?)"
-        values.extend([f"%{params['category']}%", f"%{params['category']}%"])
+    if params["big_category"]:
+        sql += " AND big_category = ?"
+        values.append(params["big_category"])
 
     if params["location"]:
         sql += " AND location LIKE ?"
@@ -233,48 +254,32 @@ def import_excel_file(file_stream):
     skipped = 0
     errors = 0
     error_details = []
+    deleted_products = 0
+    deleted_logs = 0
+    
     conn = get_db_connection()
-
-    for sheet_name in sheet_names:
-        if sheet_name not in list(NORMAL_SHEETS.keys()) + ["魚倉庫在庫"]:
-            continue
-        sheet = workbook[sheet_name]
-        for row in range(4, sheet.max_row + 1):
-            try:
-                record = parse_inventory_row(sheet, sheet_name, row)
-                if record is None:
-                    skipped += 1
-                    continue
-                existing = conn.execute(
-                    "SELECT id FROM products WHERE source_sheet = ? AND source_row = ?",
-                    (record["source_sheet"], record["source_row"]),
-                ).fetchone()
-                if existing:
-                    conn.execute(
-                        "UPDATE products SET big_category = ?, maker_or_product = ?, overview = ?, sku = ?, stock_status = ?, display_flag = ?, available_stock = ?, total_stock = ?, reorder_point = ?, staff_stock_json = ?, notes = ?, imported_at = ?, current_stock = ?, name = ?, category = ?, location = ?, updated_at = ? WHERE source_sheet = ? AND source_row = ?",
-                        (
-                            record["big_category"],
-                            record["maker_or_product"],
-                            record["overview"],
-                            record["sku"],
-                            record["stock_status"],
-                            record["display_flag"],
-                            record["available_stock"],
-                            record["total_stock"],
-                            record["reorder_point"],
-                            record["staff_stock_json"],
-                            record["notes"],
-                            record["imported_at"],
-                            record["current_stock"],
-                            record["name"],
-                            record["category"],
-                            record["location"],
-                            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            record["source_sheet"],
-                            record["source_row"],
-                        ),
-                    )
-                else:
+    
+    try:
+        # Delete old data before importing
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM stock_logs")
+        deleted_logs = cursor.rowcount
+        cursor.execute("DELETE FROM products")
+        deleted_products = cursor.rowcount
+        conn.commit()
+        
+        # Now import new data
+        for sheet_name in sheet_names:
+            if sheet_name not in list(NORMAL_SHEETS.keys()) + ["魚倉庫在庫"]:
+                continue
+            sheet = workbook[sheet_name]
+            for row in range(4, sheet.max_row + 1):
+                try:
+                    record = parse_inventory_row(sheet, sheet_name, row)
+                    if record is None:
+                        skipped += 1
+                        continue
+                    
                     conn.execute(
                         "INSERT INTO products (source_sheet, source_row, big_category, maker_or_product, overview, sku, stock_status, display_flag, available_stock, total_stock, reorder_point, staff_stock_json, notes, imported_at, current_stock, name, category, location, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         (
@@ -300,17 +305,25 @@ def import_excel_file(file_stream):
                             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                         ),
                     )
-                imported += 1
-            except Exception as exc:
-                errors += 1
-                error_details.append(f"{sheet_name} 行 {row}: {exc}")
-    conn.commit()
-    conn.close()
+                    imported += 1
+                except Exception as exc:
+                    errors += 1
+                    error_details.append(f"{sheet_name} 行 {row}: {exc}")
+        
+        conn.commit()
+    except Exception as exc:
+        conn.rollback()
+        raise exc
+    finally:
+        conn.close()
+    
     return {
         "imported": imported,
         "skipped": skipped,
         "errors": errors,
         "error_details": error_details,
+        "deleted_products": deleted_products,
+        "deleted_logs": deleted_logs,
     }
 
 
@@ -354,11 +367,19 @@ def inventory():
     sql, values = build_product_query(params)
     conn = get_db_connection()
     products = conn.execute(sql, values).fetchall()
+    
+    # Get all distinct big_categories
+    big_categories_result = conn.execute(
+        "SELECT DISTINCT big_category FROM products WHERE big_category IS NOT NULL AND big_category != '' ORDER BY big_category"
+    ).fetchall()
+    big_categories = [row[0] for row in big_categories_result]
+    
     conn.close()
     return render_template(
         "inventory.html",
         products=products,
         params=params,
+        big_categories=big_categories,
     )
 
 
@@ -373,10 +394,11 @@ def excel_import():
             flash(".xlsxファイルをアップロードしてください。", "danger")
         else:
             result = import_excel_file(uploaded_file)
+            deleted_msg = f"旧データ：{result['deleted_products']}件の商品と{result['deleted_logs']}件のログを削除しました。"
             if result["errors"] == 0:
-                flash(f"Excel取込が完了しました。{result['imported']}件を登録し、{result['skipped']}件をスキップしました。", "success")
+                flash(f"Excel取込が完了しました。{deleted_msg} 新規登録：{result['imported']}件、スキップ：{result['skipped']}件。", "success")
             else:
-                flash(f"Excel取込が完了しました。{result['imported']}件を登録し、{result['skipped']}件をスキップし、{result['errors']}件のエラーが発生しました。", "danger")
+                flash(f"Excel取込が完了しました。{deleted_msg} 新規登録：{result['imported']}件、スキップ：{result['skipped']}件、エラー：{result['errors']}件。", "danger")
     return render_template("excel_import.html", result=result)
 
 
