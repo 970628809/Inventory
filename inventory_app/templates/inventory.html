@@ -36,6 +36,7 @@
           <th>最終入庫日</th>
           <th>最終出庫日</th>
           <th>状態</th>
+          <th>操作</th>
         </tr>
       </thead>
       <tbody>
@@ -58,6 +59,13 @@
             <td>{{ product.last_in_date or '-' }}</td>
             <td>{{ product.last_out_date or '-' }}</td>
             <td>{{ status }}</td>
+            <td>
+              <div class="btn-group" role="group">
+                <a href="{{ url_for('stock_operate', product_id=product.id, type='inbound') }}" class="btn btn-sm btn-success">入庫</a>
+                <a href="{{ url_for('stock_operate', product_id=product.id, type='outbound') }}" class="btn btn-sm btn-danger">出庫</a>
+                <a href="{{ url_for('stock_operate', product_id=product.id, type='adjustment') }}" class="btn btn-sm btn-secondary">棚卸</a>
+              </div>
+            </td>
           </tr>
         {% else %}
           <tr>

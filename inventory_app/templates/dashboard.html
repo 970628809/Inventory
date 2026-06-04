@@ -80,7 +80,7 @@
               <td>{{ log.created_at }}</td>
               <td>{{ log.sku }}</td>
               <td>{{ log.name }}</td>
-              <td>{{ log.operation_type }}</td>
+              <td>{{ operation_labels[log.operation_type] if log.operation_type in operation_labels else log.operation_type }}</td>
               <td>{{ log.quantity }}</td>
               <td>{{ log.staff_name }}</td>
               <td>{{ log.note }}</td>

@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request
+import os
+from flask import Flask, render_template, request, redirect, url_for, flash
 import sqlite3
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -7,6 +8,13 @@ BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "inventory.db"
 
 app = Flask(__name__)
+app.secret_key = "inventory-secret-key"
+
+OPERATION_LABELS = {
+    "inbound": "入庫",
+    "outbound": "出庫",
+    "adjustment": "棚卸",
+}
 
 
 def get_db_connection():
@@ -79,6 +87,7 @@ def dashboard():
         stagnant_stock=stagnant_stock,
         recent_logs=recent_logs,
         cutoff=cutoff,
+        operation_labels=OPERATION_LABELS,
     )
 
 
@@ -96,5 +105,82 @@ def inventory():
     )
 
 
+@app.route("/stock/operate/<int:product_id>", methods=["GET", "POST"])
+def stock_operate(product_id):
+    operation_type = request.args.get("type", "inbound")
+    if operation_type not in ["inbound", "outbound", "adjustment"]:
+        operation_type = "inbound"
+
+    conn = get_db_connection()
+    product = conn.execute(
+        "SELECT * FROM products WHERE id = ?", (product_id,)
+    ).fetchone()
+
+    if product is None:
+        conn.close()
+        return "商品が見つかりません。", 404
+
+    error_message = None
+    if request.method == "POST":
+        staff_name = request.form.get("staff_name", "").strip()
+        note = request.form.get("note", "").strip()
+        today = datetime.today().date().isoformat()
+        current_stock = product["current_stock"]
+        quantity = None
+        change = None
+        last_in_date = product["last_in_date"]
+        last_out_date = product["last_out_date"]
+
+        if operation_type == "adjustment":
+            actual_quantity = request.form.get("actual_quantity", type=int)
+            if actual_quantity is None or actual_quantity < 0:
+                error_message = "正しい実際在庫数を入力してください。"
+            else:
+                change = actual_quantity - current_stock
+                quantity = change
+                new_stock = actual_quantity
+        else:
+            quantity = request.form.get("quantity", type=int)
+            if quantity is None or quantity < 0:
+                error_message = "正しい数量を入力してください。"
+            else:
+                if operation_type == "inbound":
+                    change = quantity
+                    new_stock = current_stock + quantity
+                    last_in_date = today
+                elif operation_type == "outbound":
+                    if quantity > current_stock:
+                        error_message = "在庫が不足しています。"
+                    else:
+                        change = -quantity
+                        new_stock = current_stock - quantity
+                        last_out_date = today
+
+        if error_message is None and change is not None:
+            conn.execute(
+                "UPDATE products SET current_stock = ?, last_in_date = ?, last_out_date = ?, updated_at = ? WHERE id = ?",
+                (new_stock, last_in_date, last_out_date, today + " 00:00:00", product_id),
+            )
+            conn.execute(
+                "INSERT INTO stock_logs (product_id, operation_type, quantity, staff_name, note, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (product_id, operation_type, quantity, staff_name, note, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            )
+            conn.commit()
+            conn.close()
+            flash("在庫操作が正常に完了しました。", "success")
+            return redirect(url_for("inventory"))
+
+    conn.close()
+    return render_template(
+        "stock_operation.html",
+        product=product,
+        operation_type=operation_type,
+        operation_label=OPERATION_LABELS.get(operation_type, operation_type),
+        error_message=error_message,
+    )
+
+
 if __name__ == "__main__":
-    app.run(debug=True, host="127.0.0.1", port=5000)
+    host = os.getenv("APP_HOST", "127.0.0.1")
+    port = int(os.getenv("APP_PORT", "5001"))
+    app.run(debug=True, host=host, port=port)
