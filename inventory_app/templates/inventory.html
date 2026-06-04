@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% block content %}
+  <h1>在庫一覧</h1>
+  <form method="get" class="row gy-2 gx-2 align-items-end mb-4">
+    <div class="col-md-3">
+      <label class="form-label">商品名 / SKU</label>
+      <input type="text" name="q" value="{{ params.q }}" class="form-control" placeholder="検索...">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">カテゴリー</label>
+      <input type="text" name="category" value="{{ params.category }}" class="form-control" placeholder="カテゴリー">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">保管場所</label>
+      <input type="text" name="location" value="{{ params.location }}" class="form-control" placeholder="棚・倉庫">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">SKU</label>
+      <input type="text" name="sku" value="{{ params.sku }}" class="form-control" placeholder="SKU">
+    </div>
+    <div class="col-md-2">
+      <button type="submit" class="btn btn-primary w-100">検索</button>
+    </div>
+  </form>
+
+  <div class="table-responsive">
+    <table class="table table-bordered table-hover align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>SKU</th>
+          <th>商品名</th>
+          <th>カテゴリー</th>
+          <th>保管場所</th>
+          <th>在庫</th>
+          <th>最低在庫</th>
+          <th>最終入庫日</th>
+          <th>最終出庫日</th>
+          <th>状態</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for product in products %}
+          {% set status = '' %}
+          {% if product.current_stock == 0 %}
+            {% set status = '在庫 0' %}
+          {% elif product.current_stock <= product.reorder_point %}
+            {% set status = '低在庫' %}
+          {% else %}
+            {% set status = '正常' %}
+          {% endif %}
+          <tr>
+            <td>{{ product.sku }}</td>
+            <td>{{ product.name }}</td>
+            <td>{{ product.category }}</td>
+            <td>{{ product.location }}</td>
+            <td>{{ product.current_stock }}</td>
+            <td>{{ product.reorder_point }}</td>
+            <td>{{ product.last_in_date or '-' }}</td>
+            <td>{{ product.last_out_date or '-' }}</td>
+            <td>{{ status }}</td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="9" class="text-center">該当する商品が見つかりません。</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

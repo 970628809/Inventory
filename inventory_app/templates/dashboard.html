@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% block content %}
+  <h1>ダッシュボード</h1>
+  <p class="text-muted">在庫の状態を簡単に確認できます。</p>
+
+  <div class="row gy-4">
+    <div class="col-md-4">
+      <div class="card border-danger h-100">
+        <div class="card-body">
+          <h5 class="card-title">在庫 0 商品</h5>
+          <p class="card-text">現在在庫が 0 の商品です。</p>
+          {% if zero_stock %}
+            <ul class="list-group list-group-flush">
+              {% for product in zero_stock %}
+                <li class="list-group-item">{{ product.sku }} - {{ product.name }}</li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="text-success">該当なし</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card border-warning h-100">
+        <div class="card-body">
+          <h5 class="card-title">低在庫商品</h5>
+          <p class="card-text">在庫が発注点以下の商品です。</p>
+          {% if low_stock %}
+            <ul class="list-group list-group-flush">
+              {% for product in low_stock %}
+                <li class="list-group-item">{{ product.sku }} - {{ product.name }} ({{ product.current_stock }})</li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="text-success">該当なし</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card border-info h-100">
+        <div class="card-body">
+          <h5 class="card-title">不動在庫商品</h5>
+          <p class="card-text">30 日以上出庫がない商品です。</p>
+          {% if stagnant_stock %}
+            <ul class="list-group list-group-flush">
+              {% for product in stagnant_stock %}
+                <li class="list-group-item">{{ product.sku }} - {{ product.name }} (最終出庫: {{ product.last_out_date }})</li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="text-success">該当なし</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section class="mt-5">
+    <h2>最近の在庫変動</h2>
+    {% if recent_logs %}
+      <table class="table table-sm table-striped">
+        <thead>
+          <tr>
+            <th>日時</th>
+            <th>SKU</th>
+            <th>商品名</th>
+            <th>操作</th>
+            <th>数量</th>
+            <th>担当</th>
+            <th>メモ</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in recent_logs %}
+            <tr>
+              <td>{{ log.created_at }}</td>
+              <td>{{ log.sku }}</td>
+              <td>{{ log.name }}</td>
+              <td>{{ log.operation_type }}</td>
+              <td>{{ log.quantity }}</td>
+              <td>{{ log.staff_name }}</td>
+              <td>{{ log.note }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>まだ在庫変動の記録がありません。</p>
+    {% endif %}
+  </section>
+{% endblock %}
