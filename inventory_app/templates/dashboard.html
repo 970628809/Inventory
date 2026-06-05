@@ -145,6 +145,7 @@
                   <th class="text-center">数量</th>
                   <th>担当</th>
                   <th>メモ</th>
+                  <th class="text-center">編集</th>
                 </tr>
               </thead>
               <tbody>
@@ -169,6 +170,9 @@
                     <td class="text-center"><strong>{{ log.quantity }}</strong></td>
                     <td><small>{{ log.staff_name }}</small></td>
                     <td><small>{{ log.note }}</small></td>
+                    <td class="text-center">
+                      <a href="{{ url_for('edit_stock_log', log_id=log.id) }}" class="btn btn-sm btn-outline-primary">編集</a>
+                    </td>
                   </tr>
                 {% endfor %}
               </tbody>

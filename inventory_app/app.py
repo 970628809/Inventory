@@ -339,7 +339,7 @@ def dashboard():
     ).fetchall()
 
     low_stock = conn.execute(
-        "SELECT * FROM products WHERE reorder_point > 0 AND available_stock <= reorder_point ORDER BY available_stock ASC"
+        "SELECT * FROM products WHERE reorder_point > 0 AND available_stock > 0 AND available_stock <= reorder_point ORDER BY available_stock ASC"
     ).fetchall()
 
     stagnant_stock = conn.execute(
@@ -359,6 +359,39 @@ def dashboard():
         recent_logs=recent_logs,
         cutoff=cutoff,
         operation_labels=OPERATION_LABELS,
+    )
+
+
+@app.route("/stock/log/edit/<int:log_id>", methods=["GET", "POST"])
+def edit_stock_log(log_id):
+    conn = get_db_connection()
+    log = conn.execute(
+        "SELECT stock_logs.*, products.name, products.sku FROM stock_logs JOIN products ON stock_logs.product_id = products.id WHERE stock_logs.id = ?",
+        (log_id,),
+    ).fetchone()
+    if log is None:
+        conn.close()
+        return "ログが見つかりません。", 404
+
+    error_message = None
+    if request.method == "POST":
+        staff_name = request.form.get("staff_name", "").strip()
+        note = request.form.get("note", "").strip()
+        conn.execute(
+            "UPDATE stock_logs SET staff_name = ?, note = ? WHERE id = ?",
+            (staff_name, note, log_id),
+        )
+        conn.commit()
+        conn.close()
+        flash("在庫記録を更新しました。", "success")
+        return redirect(url_for("dashboard"))
+
+    conn.close()
+    return render_template(
+        "edit_stock_log.html",
+        log=log,
+        operation_label=OPERATION_LABELS.get(log["operation_type"], log["operation_type"]),
+        error_message=error_message,
     )
 
 

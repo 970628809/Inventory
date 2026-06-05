@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block content %}
+  <h1>在庫記録の編集</h1>
+  <div class="card mb-4">
+    <div class="card-body">
+      <dl class="row mb-0">
+        <dt class="col-sm-3">日時</dt>
+        <dd class="col-sm-9">{{ log.created_at }}</dd>
+
+        <dt class="col-sm-3">品番</dt>
+        <dd class="col-sm-9"><code>{{ log.sku }}</code></dd>
+
+        <dt class="col-sm-3">商品名</dt>
+        <dd class="col-sm-9">{{ log.name }}</dd>
+
+        <dt class="col-sm-3">操作</dt>
+        <dd class="col-sm-9">{{ operation_label }}</dd>
+
+        <dt class="col-sm-3">数量</dt>
+        <dd class="col-sm-9"><strong>{{ log.quantity }}</strong></dd>
+      </dl>
+    </div>
+  </div>
+
+  <form method="post">
+    <div class="mb-3">
+      <label class="form-label">担当者</label>
+      <input type="text" name="staff_name" value="{{ log.staff_name or '' }}" class="form-control" placeholder="担当者名を入力してください">
+    </div>
+    <div class="mb-3">
+      <label class="form-label">メモ</label>
+      <textarea name="note" class="form-control" rows="4" placeholder="メモを入力してください">{{ log.note or '' }}</textarea>
+    </div>
+    {% if error_message %}
+      <div class="alert alert-danger">{{ error_message }}</div>
+    {% endif %}
+    <button type="submit" class="btn btn-primary">保存</button>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">キャンセル</a>
+  </form>
+{% endblock %}
