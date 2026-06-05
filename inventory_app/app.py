@@ -174,6 +174,14 @@ def parse_int(value):
             return 0
 
 
+def compute_stock_delta(operation_type, quantity):
+    if operation_type == "inbound":
+        return quantity
+    if operation_type == "outbound":
+        return -quantity
+    return quantity
+
+
 def get_cell(sheet, row, col):
     value = sheet.cell(row=row, column=col).value
     return value if value is not None else ""
@@ -488,27 +496,115 @@ def alert_settings(alert_type):
 
 @app.route("/stock/log/edit/<int:log_id>", methods=["GET", "POST"])
 def edit_stock_log(log_id):
+    params = parse_search_args()
+    selected_product_id = request.args.get("selected_product_id", type=int)
+
     conn = get_db_connection()
     log = conn.execute(
-        "SELECT stock_logs.*, products.name, products.sku FROM stock_logs JOIN products ON stock_logs.product_id = products.id WHERE stock_logs.id = ?",
+        "SELECT stock_logs.*, products.name, products.sku, products.current_stock AS product_current_stock FROM stock_logs JOIN products ON stock_logs.product_id = products.id WHERE stock_logs.id = ?",
         (log_id,),
     ).fetchone()
     if log is None:
         conn.close()
         return "ログが見つかりません。", 404
 
+    old_product = conn.execute(
+        "SELECT * FROM products WHERE id = ?",
+        (log["product_id"],),
+    ).fetchone()
+
+    search_sql, search_values = build_product_query(params)
+    search_results = conn.execute(search_sql + " LIMIT 50", search_values).fetchall()
+
+    if selected_product_id:
+        selected_product = conn.execute(
+            "SELECT * FROM products WHERE id = ?",
+            (selected_product_id,),
+        ).fetchone()
+        if selected_product is None:
+            selected_product = old_product
+    else:
+        selected_product = old_product
+
+    selected_product_id = selected_product["id"]
+
     error_message = None
     if request.method == "POST":
+        action = request.form.get("action", "save")
+        if action == "delete_log":
+            old_delta = compute_stock_delta(log["operation_type"], log["quantity"])
+            new_stock = old_product["current_stock"] - old_delta
+            conn.execute(
+                "UPDATE products SET current_stock = ?, updated_at = ? WHERE id = ?",
+                (new_stock, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), old_product["id"]),
+            )
+            conn.execute("DELETE FROM stock_logs WHERE id = ?", (log_id,))
+            conn.commit()
+            conn.close()
+            flash("在庫記録を削除しました。", "success")
+            return redirect(url_for("dashboard"))
+
+        target_product_id = request.form.get("product_id", type=int)
+        operation_type = request.form.get("operation_type", log["operation_type"])
+        quantity = request.form.get("quantity", type=int)
         staff_name = request.form.get("staff_name", "").strip()
         note = request.form.get("note", "").strip()
-        conn.execute(
-            "UPDATE stock_logs SET staff_name = ?, note = ? WHERE id = ?",
-            (staff_name, note, log_id),
-        )
-        conn.commit()
-        conn.close()
-        flash("在庫記録を更新しました。", "success")
-        return redirect(url_for("dashboard"))
+
+        if target_product_id is None:
+            error_message = "商品を選択してください。"
+        elif operation_type not in ["inbound", "outbound", "adjustment", "modification"]:
+            error_message = "有効な操作タイプを選択してください。"
+        elif quantity is None:
+            error_message = "数量を入力してください。"
+        elif quantity < 0 and operation_type in ["inbound", "outbound"]:
+            error_message = "入庫または出庫の数量は0以上で入力してください。"
+        else:
+            old_delta = compute_stock_delta(log["operation_type"], log["quantity"])
+            new_delta = compute_stock_delta(operation_type, quantity)
+            if operation_type == "outbound":
+                quantity = abs(quantity)
+                new_delta = -quantity
+
+            if target_product_id == old_product["id"]:
+                new_stock = old_product["current_stock"] + (new_delta - old_delta)
+                if new_stock < 0:
+                    error_message = "在庫数が負になります。数量を調整してください。"
+                else:
+                    conn.execute(
+                        "UPDATE products SET current_stock = ?, updated_at = ? WHERE id = ?",
+                        (new_stock, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), old_product["id"]),
+                    )
+            else:
+                target_product = conn.execute(
+                    "SELECT * FROM products WHERE id = ?",
+                    (target_product_id,),
+                ).fetchone()
+                if target_product is None:
+                    error_message = "選択した商品が見つかりません。"
+                else:
+                    new_stock_old = old_product["current_stock"] - old_delta
+                    new_stock_target = target_product["current_stock"] + new_delta
+                    if new_stock_old < 0 or new_stock_target < 0:
+                        error_message = "在庫数が負になります。商品と数量を確認してください。"
+                    else:
+                        conn.execute(
+                            "UPDATE products SET current_stock = ?, updated_at = ? WHERE id = ?",
+                            (new_stock_old, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), old_product["id"]),
+                        )
+                        conn.execute(
+                            "UPDATE products SET current_stock = ?, updated_at = ? WHERE id = ?",
+                            (new_stock_target, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), target_product_id),
+                        )
+
+            if error_message is None:
+                conn.execute(
+                    "UPDATE stock_logs SET product_id = ?, operation_type = ?, quantity = ?, staff_name = ?, note = ? WHERE id = ?",
+                    (target_product_id, operation_type, new_delta, staff_name, note, log_id),
+                )
+                conn.commit()
+                conn.close()
+                flash("在庫記録を更新しました。", "success")
+                return redirect(url_for("dashboard"))
 
     conn.close()
     return render_template(
@@ -516,6 +612,10 @@ def edit_stock_log(log_id):
         log=log,
         operation_label=OPERATION_LABELS.get(log["operation_type"], log["operation_type"]),
         error_message=error_message,
+        search_results=search_results,
+        params=params,
+        selected_product=selected_product,
+        selected_product_id=selected_product_id,
     )
 
 

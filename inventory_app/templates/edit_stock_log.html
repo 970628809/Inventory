@@ -1,40 +1,154 @@
 {% extends 'base.html' %}
 {% block content %}
   <h1>在庫記録の編集</h1>
-  <div class="card mb-4">
-    <div class="card-body">
-      <dl class="row mb-0">
-        <dt class="col-sm-3">日時</dt>
-        <dd class="col-sm-9">{{ log.created_at }}</dd>
 
-        <dt class="col-sm-3">品番</dt>
-        <dd class="col-sm-9"><code>{{ log.sku }}</code></dd>
+  <div class="row gy-4">
+    <div class="col-lg-6">
+      <div class="card mb-4">
+        <div class="card-header">
+          <h2 class="h6 mb-0">編集対象の履歴</h2>
+        </div>
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-sm-4">日時</dt>
+            <dd class="col-sm-8">{{ log.created_at }}</dd>
 
-        <dt class="col-sm-3">商品名</dt>
-        <dd class="col-sm-9">{{ log.name }}</dd>
+            <dt class="col-sm-4">元商品</dt>
+            <dd class="col-sm-8"><code>{{ log.sku }}</code> {{ log.name }}</dd>
 
-        <dt class="col-sm-3">操作</dt>
-        <dd class="col-sm-9">{{ operation_label }}</dd>
+            <dt class="col-sm-4">操作</dt>
+            <dd class="col-sm-8">{{ operation_label }}</dd>
 
-        <dt class="col-sm-3">数量</dt>
-        <dd class="col-sm-9"><strong>{{ log.quantity }}</strong></dd>
-      </dl>
+            <dt class="col-sm-4">数量</dt>
+            <dd class="col-sm-8"><strong>{{ log.quantity }}</strong></dd>
+
+            <dt class="col-sm-4">担当者</dt>
+            <dd class="col-sm-8">{{ log.staff_name or '-' }}</dd>
+
+            <dt class="col-sm-4">メモ</dt>
+            <dd class="col-sm-8"><small>{{ log.note or '-' }}</small></dd>
+          </dl>
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-header">
+          <h2 class="h6 mb-0">選択中の商品</h2>
+        </div>
+        <div class="card-body">
+          <p class="mb-2"><strong><code>{{ selected_product.sku }}</code></strong> {{ selected_product.name }}</p>
+          <p class="mb-1">現在在庫: <strong>{{ selected_product.current_stock }}</strong></p>
+          <p class="mb-0">保管場所: {{ selected_product.location or '-' }}</p>
+        </div>
+      </div>
+
+      <form method="post">
+        <input type="hidden" name="product_id" value="{{ selected_product.id }}">
+        <input type="hidden" name="action" value="save">
+
+        <div class="mb-3">
+          <label class="form-label">操作タイプ</label>
+          <select name="operation_type" class="form-select">
+            {% for key,label in {'inbound':'入庫','outbound':'出庫','adjustment':'棚卸','modification':'修正'}.items() %}
+              <option value="{{ key }}" {% if log.operation_type == key %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">数量</label>
+          <input type="number" name="quantity" value="{{ log.quantity if log.operation_type not in ['outbound'] else (-log.quantity) }}" class="form-control" step="1" min="0" placeholder="数量を入力してください">
+          <div class="form-text">出庫の場合は正の数を入力してください。棚卸/修正は増減として直接入力できます。</div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">担当者</label>
+          <input type="text" name="staff_name" value="{{ log.staff_name or '' }}" class="form-control" placeholder="担当者名を入力してください">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">メモ</label>
+          <textarea name="note" class="form-control" rows="4" placeholder="メモを入力してください">{{ log.note or '' }}</textarea>
+        </div>
+
+        {% if error_message %}
+          <div class="alert alert-danger">{{ error_message }}</div>
+        {% endif %}
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary">保存</button>
+          <button type="submit" name="action" value="delete_log" class="btn btn-outline-danger" onclick="return confirm('この記録を削除すると、在庫数も変更されます。本当に実行しますか？');">削除</button>
+          <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">キャンセル</a>
+        </div>
+      </form>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card mb-4">
+        <div class="card-header">
+          <h2 class="h6 mb-0">商品検索</h2>
+        </div>
+        <div class="card-body">
+          <form method="get" class="row gx-2 gy-2 align-items-end">
+            <input type="hidden" name="selected_product_id" value="{{ selected_product_id }}">
+            <div class="col-12 col-md-6">
+              <label class="form-label">商品名 / 品番</label>
+              <input type="text" name="q" value="{{ params.q }}" class="form-control" placeholder="検索...">
+            </div>
+            <div class="col-6 col-md-3">
+              <label class="form-label">保管場所</label>
+              <input type="text" name="location" value="{{ params.location }}" class="form-control" placeholder="棚・倉庫">
+            </div>
+            <div class="col-6 col-md-3">
+              <label class="form-label">品番</label>
+              <input type="text" name="sku" value="{{ params.sku }}" class="form-control" placeholder="品番">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">大分類</label>
+              <input type="text" name="big_category" value="{{ params.big_category }}" class="form-control" placeholder="大分類">
+            </div>
+            <div class="col-12 col-md-4">
+              <button type="submit" class="btn btn-primary w-100">検索</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2 class="h6 mb-0">検索結果</h2>
+        </div>
+        <div class="card-body p-0">
+          {% if search_results %}
+            <div class="table-responsive">
+              <table class="table table-sm table-hover mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>品番</th>
+                    <th>商品名</th>
+                    <th class="text-center">現在</th>
+                    <th class="text-center">選択</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for product in search_results %}
+                    <tr {% if product.id == selected_product_id %}class="table-primary"{% endif %}>
+                      <td><code>{{ product.sku }}</code></td>
+                      <td>{{ product.name }}</td>
+                      <td class="text-center"><strong>{{ product.current_stock }}</strong></td>
+                      <td class="text-center">
+                        <a href="{{ url_for('edit_stock_log', log_id=log.id, q=params.q, sku=params.sku, big_category=params.big_category, location=params.location, selected_product_id=product.id) }}" class="btn btn-sm btn-outline-primary">選択</a>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="p-4 text-center text-muted">該当する商品がありません。</div>
+          {% endif %}
+        </div>
+      </div>
     </div>
   </div>
-
-  <form method="post">
-    <div class="mb-3">
-      <label class="form-label">担当者</label>
-      <input type="text" name="staff_name" value="{{ log.staff_name or '' }}" class="form-control" placeholder="担当者名を入力してください">
-    </div>
-    <div class="mb-3">
-      <label class="form-label">メモ</label>
-      <textarea name="note" class="form-control" rows="4" placeholder="メモを入力してください">{{ log.note or '' }}</textarea>
-    </div>
-    {% if error_message %}
-      <div class="alert alert-danger">{{ error_message }}</div>
-    {% endif %}
-    <button type="submit" class="btn btn-primary">保存</button>
-    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">キャンセル</a>
-  </form>
 {% endblock %}
