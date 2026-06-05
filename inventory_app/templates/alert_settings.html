@@ -1,0 +1,154 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1>{{ '低在庫アラート設定' if alert_type == 'low_stock' else '在庫0アラート設定' }}</h1>
+      <p class="text-muted mb-0">
+        {% if alert_type == 'low_stock' %}
+          監視する商品と最低在庫を登録してください。現在の在庫が設定値以下のときにアラートになります。
+        {% elif alert_type == 'zero_stock' %}
+          監視対象の商品を登録してください。登録した商品が在庫0になった際にアラートになります。
+        {% else %}
+          監視対象の商品を登録してください。登録した商品が30日以上出庫されていないときにアラートになります。
+        {% endif %}
+      </p>
+    </div>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">ダッシュボードに戻る</a>
+  </div>
+
+  <form method="get" class="row gy-2 gx-2 align-items-end mb-4">
+    <input type="hidden" name="alert_type" value="{{ alert_type }}">
+    <div class="col-md-3">
+      <label class="form-label">商品名 / 品番</label>
+      <input type="text" name="q" value="{{ params.q }}" class="form-control" placeholder="検索...">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">保管場所</label>
+      <input type="text" name="location" value="{{ params.location }}" class="form-control" placeholder="棚・倉庫">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">品番</label>
+      <input type="text" name="sku" value="{{ params.sku }}" class="form-control" placeholder="品番">
+    </div>
+    <div class="col-md-2">
+      {% if params.big_category %}
+        <input type="hidden" name="big_category" value="{{ params.big_category }}">
+      {% endif %}
+      <button type="submit" class="btn btn-primary w-100">検索</button>
+    </div>
+  </form>
+
+  <div class="row">
+    <div class="col-lg-6 mb-4">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h2 class="h5 mb-0">{{ '登録済み商品' if alert_type == 'low_stock' else '監視商品' }}</h2>
+        </div>
+        <div class="card-body p-0">
+          {% if alert_products %}
+            <div class="table-responsive">
+              <table class="table table-sm table-hover mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>品番</th>
+                    <th>商品名</th>
+                    {% if alert_type == 'low_stock' %}
+                      <th class="text-center">最低在庫</th>
+                    {% endif %}
+                    <th class="text-center">現在</th>
+                    <th class="text-center">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for product in alert_products %}
+                    <tr>
+                      <td><code>{{ product.sku }}</code></td>
+                      <td>{{ product.name }}</td>
+                      {% if alert_type == 'low_stock' %}
+                        <td class="text-center"><strong>{{ product.threshold }}</strong></td>
+                      {% endif %}
+                      <td class="text-center"><strong>{{ product.current_stock }}</strong></td>
+                      <td class="text-center">
+                        <form method="post" class="d-inline">
+                          <input type="hidden" name="action" value="remove_{{ alert_type }}">
+                          <input type="hidden" name="product_id" value="{{ product.alert_product_id }}">
+                          <button type="submit" class="btn btn-sm btn-outline-danger">削除</button>
+                        </form>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="p-4 text-center text-muted">
+              登録された商品はありません。
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6 mb-4">
+      <div class="card h-100">
+        <div class="card-header">
+          <h2 class="h5 mb-0">商品検索結果</h2>
+        </div>
+        <div class="card-body p-0">
+          {% if search_results %}
+            <div class="table-responsive">
+              <table class="table table-sm table-hover mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>品番</th>
+                    <th>商品名</th>
+                    <th class="text-center">現在</th>
+                    <th class="text-center">{% if alert_type == 'low_stock' %}最低在庫 / 追加{% else %}追加{% endif %}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for product in search_results %}
+                    <tr>
+                      <td><code>{{ product.sku }}</code></td>
+                      <td>{{ product.name }}</td>
+                      <td class="text-center"><strong>{{ product.current_stock }}</strong></td>
+                      <td class="text-center">
+                        {% if product.id in selected_product_ids %}
+                          <span class="badge bg-secondary">追加済</span>
+                        {% else %}
+                          {% if alert_type == 'low_stock' %}
+                            <form method="post" class="d-flex justify-content-center gap-2 align-items-center">
+                              <input type="hidden" name="action" value="add_low_stock">
+                              <input type="hidden" name="product_id" value="{{ product.id }}">
+                              <input type="number" name="threshold" class="form-control form-control-sm" value="{{ product.reorder_point or 0 }}" min="0" style="width: 5rem;">
+                              <button type="submit" class="btn btn-sm btn-outline-primary">追加</button>
+                            </form>
+                          {% elif alert_type == 'zero_stock' %}
+                            <form method="post">
+                              <input type="hidden" name="product_id" value="{{ product.id }}">
+                              <input type="hidden" name="action" value="add_zero_stock">
+                              <button type="submit" class="btn btn-sm btn-outline-primary">追加</button>
+                            </form>
+                          {% else %}
+                            <form method="post">
+                              <input type="hidden" name="product_id" value="{{ product.id }}">
+                              <input type="hidden" name="action" value="add_stagnant_stock">
+                              <button type="submit" class="btn btn-sm btn-outline-primary">追加</button>
+                            </form>
+                          {% endif %}
+                        {% endif %}
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="p-4 text-center text-muted">
+              該当する商品がありません。
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

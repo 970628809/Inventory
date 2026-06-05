@@ -87,7 +87,37 @@ def create_db():
         """
     )
 
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS low_stock_alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id INTEGER NOT NULL UNIQUE,
+            threshold INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS zero_stock_alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id INTEGER NOT NULL UNIQUE,
+            FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS stagnant_stock_alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id INTEGER NOT NULL UNIQUE,
+            FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE
+        )
+        """
+    )
+
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
     cursor.execute("DELETE FROM stock_logs")
     cursor.execute("DELETE FROM products")
 

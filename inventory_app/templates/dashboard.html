@@ -8,11 +8,14 @@
     <div class="col-md-4">
       <div class="card border-danger h-100">
         <div class="card-header bg-danger bg-opacity-10">
-          <h5 class="card-title mb-0 d-flex justify-content-between align-items-center">
-            <span>在庫 0 商品</span>
-            <div class="d-flex align-items-center gap-2">
-              <small class="badge bg-danger">{{ zero_stock|length }}</small>
-              <button type="button" class="btn btn-sm btn-outline-secondary dashboard-box__toggle" data-expand-target="#zeroStockBox">展開</button>
+          <h5 class="card-title mb-0">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+              <span class="fs-6">在庫 0 商品</span>
+              <div class="d-flex flex-wrap align-items-center gap-2">
+                <a href="{{ url_for('alert_settings', alert_type='zero_stock') }}" class="btn btn-sm btn-outline-primary">リマインダー</a>
+                <small class="badge bg-danger">{{ zero_stock|length }}</small>
+                <button type="button" class="btn btn-sm btn-outline-secondary dashboard-box__toggle" data-expand-target="#zeroStockBox">展開</button>
+              </div>
             </div>
           </h5>
         </div>
@@ -48,11 +51,14 @@
     <div class="col-md-4">
       <div class="card border-warning h-100">
         <div class="card-header bg-warning bg-opacity-10">
-          <h5 class="card-title mb-0 d-flex justify-content-between align-items-center">
-            <span>低在庫商品</span>
-            <div class="d-flex align-items-center gap-2">
-              <small class="badge bg-warning">{{ low_stock|length }}</small>
-              <button type="button" class="btn btn-sm btn-outline-secondary dashboard-box__toggle" data-expand-target="#lowStockBox">展開</button>
+          <h5 class="card-title mb-0">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+              <span class="fs-6">低在庫商品</span>
+              <div class="d-flex flex-wrap align-items-center gap-2">
+                <a href="{{ url_for('alert_settings', alert_type='low_stock') }}" class="btn btn-sm btn-outline-primary">リマインダー</a>
+                <small class="badge bg-warning">{{ low_stock|length }}</small>
+                <button type="button" class="btn btn-sm btn-outline-secondary dashboard-box__toggle" data-expand-target="#lowStockBox">展開</button>
+              </div>
             </div>
           </h5>
         </div>
@@ -88,11 +94,14 @@
     <div class="col-md-4">
       <div class="card border-info h-100">
         <div class="card-header bg-info bg-opacity-10">
-          <h5 class="card-title mb-0 d-flex justify-content-between align-items-center">
-            <span>不動在庫商品</span>
-            <div class="d-flex align-items-center gap-2">
-              <small class="badge bg-info">{{ stagnant_stock|length }}</small>
-              <button type="button" class="btn btn-sm btn-outline-secondary dashboard-box__toggle" data-expand-target="#stagnantStockBox">展開</button>
+          <h5 class="card-title mb-0">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+              <span class="fs-6">不動在庫商品</span>
+              <div class="d-flex flex-wrap align-items-center gap-2">
+                <a href="{{ url_for('alert_settings', alert_type='stagnant_stock') }}" class="btn btn-sm btn-outline-primary">リマインダー</a>
+                <small class="badge bg-info">{{ stagnant_stock|length }}</small>
+                <button type="button" class="btn btn-sm btn-outline-secondary dashboard-box__toggle" data-expand-target="#stagnantStockBox">展開</button>
+              </div>
             </div>
           </h5>
         </div>

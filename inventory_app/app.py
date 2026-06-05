@@ -44,6 +44,39 @@ def ensure_product_columns(conn):
     conn.commit()
 
 
+def ensure_alert_tables(conn):
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS low_stock_alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id INTEGER NOT NULL UNIQUE,
+            threshold INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS zero_stock_alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id INTEGER NOT NULL UNIQUE,
+            FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS stagnant_stock_alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id INTEGER NOT NULL UNIQUE,
+            FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE
+        )
+        """
+    )
+    conn.commit()
+
+
 def ensure_database():
     conn = sqlite3.connect(DB_PATH)
     try:
@@ -51,6 +84,7 @@ def ensure_database():
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='products'")
         if cursor.fetchone():
             ensure_product_columns(conn)
+            ensure_alert_tables(conn)
         else:
             conn.close()
             conn = None
@@ -335,15 +369,15 @@ def dashboard():
     cutoff = today - timedelta(days=30)
 
     zero_stock = conn.execute(
-        "SELECT * FROM products WHERE available_stock = 0 ORDER BY name"
+        "SELECT p.* FROM zero_stock_alerts za JOIN products p ON za.product_id = p.id WHERE p.current_stock = 0 ORDER BY p.name"
     ).fetchall()
 
     low_stock = conn.execute(
-        "SELECT * FROM products WHERE reorder_point > 0 AND available_stock > 0 AND available_stock <= reorder_point ORDER BY available_stock ASC"
+        "SELECT p.*, la.threshold FROM low_stock_alerts la JOIN products p ON la.product_id = p.id WHERE p.current_stock > 0 AND p.current_stock <= la.threshold ORDER BY p.current_stock ASC"
     ).fetchall()
 
     stagnant_stock = conn.execute(
-        "SELECT * FROM products WHERE current_stock > 0 AND last_out_date IS NOT NULL AND date(last_out_date) < date(?) ORDER BY last_out_date"
+        "SELECT p.* FROM stagnant_stock_alerts sa JOIN products p ON sa.product_id = p.id WHERE p.current_stock > 0 AND p.last_out_date IS NOT NULL AND date(p.last_out_date) < date(?) ORDER BY p.last_out_date"
     , (cutoff.isoformat(),)).fetchall()
 
     recent_logs = conn.execute(
@@ -359,6 +393,96 @@ def dashboard():
         recent_logs=recent_logs,
         cutoff=cutoff,
         operation_labels=OPERATION_LABELS,
+    )
+
+
+@app.route("/alerts/<alert_type>", methods=["GET", "POST"])
+def alert_settings(alert_type):
+    if alert_type not in ["low_stock", "zero_stock", "stagnant_stock"]:
+        return "指定されたアラートタイプが無効です。", 404
+
+    params = parse_search_args()
+    conn = get_db_connection()
+
+    if request.method == "POST":
+        action = request.form.get("action")
+        product_id = request.form.get("product_id", type=int)
+
+        if action == "add_low_stock":
+            threshold = parse_int(request.form.get("threshold"))
+            if product_id is None or threshold < 0:
+                flash("有効な商品と最低在庫を指定してください。", "danger")
+            else:
+                conn.execute(
+                    "INSERT OR REPLACE INTO low_stock_alerts (product_id, threshold) VALUES (?, ?)",
+                    (product_id, threshold),
+                )
+                conn.commit()
+                flash("低在庫リマインダーを追加しました。", "success")
+        elif action == "remove_low_stock":
+            if product_id is not None:
+                conn.execute("DELETE FROM low_stock_alerts WHERE product_id = ?", (product_id,))
+                conn.commit()
+                flash("低在庫リマインダーを削除しました。", "success")
+        elif action == "add_zero_stock":
+            if product_id is None:
+                flash("有効な商品を指定してください。", "danger")
+            else:
+                conn.execute(
+                    "INSERT OR IGNORE INTO zero_stock_alerts (product_id) VALUES (?)",
+                    (product_id,),
+                )
+                conn.commit()
+                flash("在庫0リマインダーを追加しました。", "success")
+        elif action == "remove_zero_stock":
+            if product_id is not None:
+                conn.execute("DELETE FROM zero_stock_alerts WHERE product_id = ?", (product_id,))
+                conn.commit()
+                flash("在庫0リマインダーを削除しました。", "success")
+        elif action == "add_stagnant_stock":
+            if product_id is None:
+                flash("有効な商品を指定してください。", "danger")
+            else:
+                conn.execute(
+                    "INSERT OR IGNORE INTO stagnant_stock_alerts (product_id) VALUES (?)",
+                    (product_id,),
+                )
+                conn.commit()
+                flash("不動在庫リマインダーを追加しました。", "success")
+        elif action == "remove_stagnant_stock":
+            if product_id is not None:
+                conn.execute("DELETE FROM stagnant_stock_alerts WHERE product_id = ?", (product_id,))
+                conn.commit()
+                flash("不動在庫リマインダーを削除しました。", "success")
+        conn.close()
+        return redirect(url_for("alert_settings", alert_type=alert_type, **params))
+
+    if alert_type == "low_stock":
+        alert_products = conn.execute(
+            "SELECT la.product_id AS alert_product_id, la.threshold, p.* FROM low_stock_alerts la JOIN products p ON la.product_id = p.id ORDER BY p.name"
+        ).fetchall()
+    elif alert_type == "zero_stock":
+        alert_products = conn.execute(
+            "SELECT za.product_id AS alert_product_id, p.* FROM zero_stock_alerts za JOIN products p ON za.product_id = p.id ORDER BY p.name"
+        ).fetchall()
+    else:
+        alert_products = conn.execute(
+            "SELECT sa.product_id AS alert_product_id, p.* FROM stagnant_stock_alerts sa JOIN products p ON sa.product_id = p.id ORDER BY p.name"
+        ).fetchall()
+
+    sql, values = build_product_query(params)
+    search_results = conn.execute(sql + " LIMIT 50", values).fetchall()
+    conn.close()
+
+    selected_product_ids = {row["alert_product_id"] for row in alert_products}
+
+    return render_template(
+        "alert_settings.html",
+        alert_type=alert_type,
+        alert_products=alert_products,
+        search_results=search_results,
+        selected_product_ids=selected_product_ids,
+        params=params,
     )
 
 
