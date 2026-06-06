@@ -641,6 +641,76 @@ def inventory():
     )
 
 
+@app.route("/stocktaking")
+def stocktaking():
+    params = parse_search_args()
+    sql, values = build_product_query(params)
+    conn = get_db_connection()
+    products = conn.execute(sql, values).fetchall()
+    big_categories_result = conn.execute(
+        "SELECT DISTINCT big_category FROM products WHERE big_category IS NOT NULL AND big_category != '' ORDER BY big_category"
+    ).fetchall()
+    big_categories = [row[0] for row in big_categories_result]
+    conn.close()
+    return render_template(
+        "stocktaking.html",
+        products=products,
+        params=params,
+        big_categories=big_categories,
+    )
+
+
+@app.route("/stocktaking/check/<int:product_id>", methods=["POST"])
+def stocktaking_check(product_id):
+    conn = get_db_connection()
+    product = conn.execute("SELECT id FROM products WHERE id = ?", (product_id,)).fetchone()
+    conn.close()
+    if product is None:
+        return "商品が見つかりません。", 404
+    flash("棚卸チェックを確認しました。", "success")
+    return redirect(url_for("stocktaking", **parse_search_args()))
+
+
+@app.route("/stocktaking/edit/<int:product_id>", methods=["GET", "POST"])
+def stocktaking_edit(product_id):
+    conn = get_db_connection()
+    product = conn.execute("SELECT * FROM products WHERE id = ?", (product_id,)).fetchone()
+    if product is None:
+        conn.close()
+        return "商品が見つかりません。", 404
+
+    error_message = None
+    if request.method == "POST":
+        new_stock = request.form.get("new_stock", type=int)
+        reason = request.form.get("reason", "").strip()
+        if new_stock is None or new_stock < 0:
+            error_message = "正しい在庫数を入力してください。"
+        elif not reason:
+            error_message = "理由を入力してください。"
+        else:
+            change = new_stock - product["current_stock"]
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            conn.execute(
+                "UPDATE products SET current_stock = ?, available_stock = ?, updated_at = ? WHERE id = ?",
+                (new_stock, new_stock, now, product_id),
+            )
+            conn.execute(
+                "INSERT INTO stock_logs (product_id, operation_type, quantity, staff_name, note, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (product_id, "adjustment", change, "", reason, now),
+            )
+            conn.commit()
+            conn.close()
+            flash("棚卸の修正を記録しました。", "success")
+            return redirect(url_for("stocktaking", **parse_search_args()))
+
+    conn.close()
+    return render_template(
+        "stocktaking_edit.html",
+        product=product,
+        error_message=error_message,
+    )
+
+
 @app.route("/excel_import", methods=["GET", "POST"])
 def excel_import():
     result = None

@@ -1,18 +1,16 @@
 {% extends 'base.html' %}
 {% block content %}
-  <h1>在庫一覧</h1>
+  <h1>棚卸</h1>
 
-  <!-- 大分類フィルタボタン -->
   <div class="mb-3">
     <div class="btn-group" role="group">
-      <a href="{{ url_for('inventory') }}" class="btn btn-sm {% if not params.big_category %}btn-primary{% else %}btn-outline-primary{% endif %}">すべて</a>
+      <a href="{{ url_for('stocktaking') }}" class="btn btn-sm {% if not params.big_category %}btn-primary{% else %}btn-outline-primary{% endif %}">すべて</a>
       {% for category in big_categories %}
-        <a href="{{ url_for('inventory', big_category=category, q=params.q, sku=params.sku, location=params.location) }}" class="btn btn-sm {% if params.big_category == category %}btn-primary{% else %}btn-outline-primary{% endif %}">{{ category }}</a>
+        <a href="{{ url_for('stocktaking', big_category=category, q=params.q, sku=params.sku, location=params.location) }}" class="btn btn-sm {% if params.big_category == category %}btn-primary{% else %}btn-outline-primary{% endif %}">{{ category }}</a>
       {% endfor %}
     </div>
   </div>
 
-  <!-- 検索フォーム -->
   <form method="get" class="row gy-2 gx-2 align-items-end mb-4">
     <div class="col-md-3">
       <label class="form-label">商品名 / 品番</label>
@@ -42,42 +40,32 @@
           <th>メーカー/商品</th>
           <th>概要</th>
           <th>品番</th>
-          <th class="text-center">販売可能台数</th>
+          <th class="text-center">現在在庫</th>
           <th class="text-center">総台数</th>
           <th>担当者別在庫</th>
           <th>備考</th>
           <th class="text-center">元シート</th>
-          <th class="text-center">操作</th>
+          <th class="text-center">Check</th>
         </tr>
       </thead>
       <tbody>
         {% for product in products %}
-          {% set status = '' %}
-          {% set status_color = '' %}
-          {% if product.available_stock == 0 %}
-            {% set status = '在庫0' %}
-            {% set status_color = 'bg-danger bg-opacity-10' %}
-          {% elif product.reorder_point > 0 and product.available_stock <= product.reorder_point %}
-            {% set status = '低在庫' %}
-            {% set status_color = 'bg-warning bg-opacity-10' %}
-          {% else %}
-            {% set status = '正常' %}
-            {% set status_color = 'bg-success bg-opacity-10' %}
-          {% endif %}
-          <tr class="{{ status_color }}">
+          <tr>
             <td class="text-center"><span class="badge bg-primary">{{ product.big_category }}</span></td>
             <td><strong>{{ product.maker_or_product }}</strong></td>
             <td><small>{{ product.overview }}</small></td>
             <td><code>{{ product.sku }}</code></td>
-            <td class="text-center"><strong>{{ product.available_stock }}</strong></td>
+            <td class="text-center"><strong>{{ product.current_stock }}</strong></td>
             <td class="text-center">{{ product.total_stock }}</td>
             <td><small>{{ product.staff_stock_json | format_staff_stock }}</small></td>
             <td><small>{{ product.notes }}</small></td>
             <td class="text-center"><small>{{ product.source_sheet }}</small></td>
-            <td>
+            <td class="text-center">
               <div class="btn-group btn-group-sm" role="group">
-                <a href="{{ url_for('stock_operate', product_id=product.id, type='inbound') }}" class="btn btn-success" title="入庫">入庫</a>
-                <a href="{{ url_for('stock_operate', product_id=product.id, type='outbound') }}" class="btn btn-danger" title="出庫">出庫</a>
+                <form method="post" action="{{ url_for('stocktaking_check', product_id=product.id, q=params.q, sku=params.sku, big_category=params.big_category, location=params.location) }}">
+                  <button type="submit" class="btn btn-outline-success" title="確認">✓</button>
+                </form>
+                <a href="{{ url_for('stocktaking_edit', product_id=product.id) }}" class="btn btn-outline-warning" title="修正">修正</a>
               </div>
             </td>
           </tr>

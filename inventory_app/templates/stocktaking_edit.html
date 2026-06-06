@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block content %}
+  <h1>棚卸修正</h1>
+  <p>商品: <strong>{{ product.name }}</strong>（品番: {{ product.sku }}）</p>
+  <p>現在在庫: <strong>{{ product.current_stock }}</strong></p>
+
+  {% if error_message %}
+    <div class="alert alert-danger">{{ error_message }}</div>
+  {% endif %}
+
+  <form method="post" class="row gy-3">
+    <div class="col-md-6">
+      <label class="form-label">修正後数量</label>
+      <input type="number" name="new_stock" class="form-control" min="0" value="{{ product.current_stock }}" required>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">理由</label>
+      <input type="text" name="reason" class="form-control" placeholder="例: 棚卸差異" required>
+    </div>
+    <div class="col-12">
+      <button type="submit" class="btn btn-primary">修正を保存</button>
+      <a href="{{ url_for('stocktaking') }}" class="btn btn-outline-secondary">戻る</a>
+    </div>
+  </form>
+{% endblock %}
