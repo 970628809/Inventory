@@ -1,6 +1,6 @@
 import json
 import os
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, session
 import sqlite3
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -657,7 +657,17 @@ def stocktaking():
         products=products,
         params=params,
         big_categories=big_categories,
+        is_started=session.get("stocktaking_started", False),
+        checked_product_ids=set(session.get("stocktaking_checked_ids", [])),
     )
+
+
+@app.route("/stocktaking/start", methods=["POST"])
+def stocktaking_start():
+    session["stocktaking_started"] = True
+    session["stocktaking_checked_ids"] = []
+    flash("棚卸を開始しました。", "success")
+    return redirect(url_for("stocktaking", **parse_search_args()))
 
 
 @app.route("/stocktaking/check/<int:product_id>", methods=["POST"])
@@ -667,8 +677,11 @@ def stocktaking_check(product_id):
     conn.close()
     if product is None:
         return "商品が見つかりません。", 404
+    checked_ids = set(session.get("stocktaking_checked_ids", []))
+    checked_ids.add(product_id)
+    session["stocktaking_checked_ids"] = list(checked_ids)
     flash("棚卸チェックを確認しました。", "success")
-    return redirect(url_for("stocktaking", **parse_search_args()))
+    return redirect(url_for("stocktaking", **parse_search_args()) + f"#product-{product_id}")
 
 
 @app.route("/stocktaking/edit/<int:product_id>", methods=["GET", "POST"])
