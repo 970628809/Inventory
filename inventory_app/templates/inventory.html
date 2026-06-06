@@ -1,6 +1,9 @@
 {% extends 'base.html' %}
 {% block content %}
-  <h1>在庫一覧</h1>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="mb-0">在庫一覧</h1>
+    <a href="{{ url_for('inventory_new') }}" class="btn btn-primary">新品追加</a>
+  </div>
 
   <!-- 大分類フィルタボタン -->
   <div class="mb-3">
@@ -35,7 +38,7 @@
   </form>
 
   <div class="table-responsive">
-    <table class="table table-bordered table-hover align-middle table-sm">
+    <table class="table table-bordered table-hover align-middle table-sm stock-table">
       <thead class="table-dark sticky-top">
         <tr>
           <th class="text-center">大分類</th>

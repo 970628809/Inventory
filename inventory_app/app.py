@@ -175,6 +175,52 @@ def parse_int(value):
             return 0
 
 
+def parse_staff_stock_form():
+    staff_stock = {}
+    names = request.form.getlist("staff_name")
+    quantities = request.form.getlist("staff_quantity")
+    for name, quantity in zip(names, quantities):
+        name = name.strip()
+        stock = parse_int(quantity)
+        if name and stock != 0:
+            staff_stock[name] = stock
+    return staff_stock
+
+
+def get_inventory_form_options(conn):
+    categories = [
+        row[0] for row in conn.execute(
+            "SELECT DISTINCT big_category FROM products WHERE big_category IS NOT NULL AND big_category != '' ORDER BY big_category"
+        ).fetchall()
+    ]
+    makers = [
+        row[0] for row in conn.execute(
+            "SELECT DISTINCT maker_or_product FROM products WHERE maker_or_product IS NOT NULL AND maker_or_product != '' ORDER BY maker_or_product"
+        ).fetchall()
+    ]
+    source_sheets = [
+        row[0] for row in conn.execute(
+            "SELECT DISTINCT source_sheet FROM products WHERE source_sheet IS NOT NULL AND source_sheet != '' ORDER BY source_sheet"
+        ).fetchall()
+    ]
+    staff_names = set()
+    rows = conn.execute(
+        "SELECT staff_stock_json FROM products WHERE staff_stock_json IS NOT NULL AND staff_stock_json != ''"
+    ).fetchall()
+    for row in rows:
+        try:
+            staff_names.update(json.loads(row[0]).keys())
+        except Exception:
+            continue
+    return {
+        "categories": categories,
+        "makers": makers,
+        "source_sheets": source_sheets,
+        "staff_names": sorted(staff_names),
+        "quantities": list(range(0, 21)),
+    }
+
+
 def compute_stock_delta(operation_type, quantity):
     if operation_type == "inbound":
         return quantity
@@ -639,6 +685,83 @@ def inventory():
         products=products,
         params=params,
         big_categories=big_categories,
+    )
+
+
+@app.route("/inventory/new", methods=["GET", "POST"])
+def inventory_new():
+    conn = get_db_connection()
+    options = get_inventory_form_options(conn)
+    error_message = None
+    form_data = {}
+
+    if request.method == "POST":
+        form_data = request.form.to_dict()
+        big_category = request.form.get("big_category", "").strip()
+        maker_or_product = request.form.get("maker_or_product", "").strip()
+        overview = request.form.get("overview", "").strip()
+        sku = request.form.get("sku", "").strip()
+        available_stock = parse_int(request.form.get("available_stock"))
+        total_stock = parse_int(request.form.get("total_stock"))
+        notes = request.form.get("notes", "").strip()
+        source_sheet = request.form.get("source_sheet", "").strip() or "手動追加"
+        staff_stock = parse_staff_stock_form()
+
+        if not big_category:
+            error_message = "大分類を入力してください。"
+        elif not maker_or_product:
+            error_message = "メーカー/商品を入力してください。"
+        elif not sku:
+            error_message = "品番を入力してください。"
+        elif available_stock < 0 or total_stock < 0:
+            error_message = "台数は0以上で入力してください。"
+        else:
+            existing = conn.execute("SELECT id FROM products WHERE sku = ?", (sku,)).fetchone()
+            if existing:
+                error_message = "同じ品番の商品がすでにあります。"
+
+        if error_message is None:
+            source_row = conn.execute(
+                "SELECT COALESCE(MAX(source_row), 0) + 1 FROM products WHERE source_sheet = ?",
+                (source_sheet,),
+            ).fetchone()[0]
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            conn.execute(
+                "INSERT INTO products (source_sheet, source_row, big_category, maker_or_product, overview, sku, stock_status, display_flag, available_stock, total_stock, reorder_point, staff_stock_json, notes, imported_at, current_stock, name, category, location, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    source_sheet,
+                    source_row,
+                    big_category,
+                    maker_or_product,
+                    overview,
+                    sku,
+                    "",
+                    "",
+                    available_stock,
+                    total_stock,
+                    0,
+                    json.dumps(staff_stock, ensure_ascii=False),
+                    notes,
+                    now,
+                    available_stock,
+                    maker_or_product,
+                    big_category,
+                    "",
+                    now,
+                    now,
+                ),
+            )
+            conn.commit()
+            conn.close()
+            flash("新品を追加しました。", "success")
+            return redirect(url_for("inventory"))
+
+    conn.close()
+    return render_template(
+        "inventory_new.html",
+        options=options,
+        error_message=error_message,
+        form_data=form_data,
     )
 
 

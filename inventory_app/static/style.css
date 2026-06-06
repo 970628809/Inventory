@@ -65,8 +65,8 @@ td.stock-table-overview small {
 }
 
 .stock-table-staff {
-  max-width: 5.5rem;
-  width: 5.5rem;
+  max-width: 7.5rem;
+  width: 7.5rem;
 }
 
 .stock-table-notes {
@@ -81,7 +81,12 @@ td.stock-table-notes small {
 }
 
 .stock-table-source {
-  min-width: 8rem;
+  min-width: 6.5rem;
+  white-space: nowrap;
+}
+
+.stock-table thead th {
+  text-align: center;
   white-space: nowrap;
 }
 
