@@ -5,6 +5,7 @@ import sqlite3
 from pathlib import Path
 from datetime import datetime, timedelta
 from openpyxl import load_workbook
+from markupsafe import Markup, escape
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "inventory.db"
@@ -109,7 +110,7 @@ def format_staff_stock_display(staff_stock_json):
     """
     Filter to display staff stock without zero values.
     Input: JSON string like '{"A05": 1, "A06": 0, "H12": 2}'
-    Output: "A05: 1 / H12: 2" or "-" if empty or all zeros
+    Output: each staff stock on its own line, or "-" if empty or all zeros
     """
     if not staff_stock_json:
         return "-"
@@ -118,7 +119,7 @@ def format_staff_stock_display(staff_stock_json):
         non_zero = {k: v for k, v in data.items() if v != 0}
         if not non_zero:
             return "-"
-        return " / ".join([f"{k}: {v}" for k, v in non_zero.items()])
+        return Markup("<br>".join([f"{escape(k)}: {escape(v)}" for k, v in non_zero.items()]))
     except Exception:
         return "-"
 
@@ -667,6 +668,14 @@ def stocktaking_start():
     session["stocktaking_started"] = True
     session["stocktaking_checked_ids"] = []
     flash("棚卸を開始しました。", "success")
+    return redirect(url_for("stocktaking", **parse_search_args()))
+
+
+@app.route("/stocktaking/end", methods=["POST"])
+def stocktaking_end():
+    session["stocktaking_started"] = False
+    session["stocktaking_checked_ids"] = []
+    flash("棚卸を終了しました。", "success")
     return redirect(url_for("stocktaking", **parse_search_args()))
 
 
