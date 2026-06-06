@@ -53,14 +53,25 @@ body {
   width: 4rem;
 }
 
+.stock-table-overview {
+  max-width: 8rem;
+  width: 8rem;
+}
+
+td.stock-table-overview small {
+  display: block;
+  max-height: 2.5rem;
+  overflow: hidden;
+}
+
 .stock-table-staff {
-  max-width: 7rem;
-  width: 7rem;
+  max-width: 5.5rem;
+  width: 5.5rem;
 }
 
 .stock-table-notes {
-  max-width: 5rem;
-  width: 5rem;
+  max-width: 9rem;
+  width: 9rem;
 }
 
 td.stock-table-notes small {
@@ -72,4 +83,15 @@ td.stock-table-notes small {
 .stock-table-source {
   min-width: 8rem;
   white-space: nowrap;
+}
+
+.stock-table-actions-col {
+  min-width: 9rem;
+  width: 9rem;
+}
+
+.inventory-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(4rem, 1fr));
+  gap: 0.25rem;
 }

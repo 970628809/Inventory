@@ -52,7 +52,7 @@
         <tr>
           <th class="text-center">大分類</th>
           <th>メーカー/商品</th>
-          <th>概要</th>
+          <th class="stock-table-overview">概要</th>
           <th>品番</th>
           <th class="text-center">現在在庫</th>
           <th class="text-center">総台数</th>
@@ -67,7 +67,7 @@
           <tr id="product-{{ product.id }}" class="{% if product.id in checked_product_ids %}table-success{% endif %}">
             <td class="text-center"><span class="badge bg-primary">{{ product.big_category }}</span></td>
             <td><strong>{{ product.maker_or_product }}</strong></td>
-            <td><small>{{ product.overview }}</small></td>
+            <td class="stock-table-overview"><small>{{ product.overview }}</small></td>
             <td><code>{{ product.sku }}</code></td>
             <td class="text-center"><strong>{{ product.current_stock }}</strong></td>
             <td class="text-center">{{ product.total_stock }}</td>
