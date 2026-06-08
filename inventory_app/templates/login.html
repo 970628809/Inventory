@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-md-5 col-lg-4">
+      <h1 class="h3 mb-3">ログイン</h1>
+
+      {% if error_message %}
+        <div class="alert alert-danger">{{ error_message }}</div>
+      {% endif %}
+
+      <form method="post" class="card">
+        <div class="card-body">
+          <div class="mb-3">
+            <label class="form-label">ユーザー名</label>
+            <input type="text" name="username" class="form-control" required autofocus>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">パスワード</label>
+            <input type="password" name="password" class="form-control" required>
+          </div>
+          <button type="submit" class="btn btn-primary w-100">ログイン</button>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endblock %}

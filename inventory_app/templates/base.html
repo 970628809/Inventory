@@ -16,9 +16,17 @@
             <li class="nav-item"><a class="nav-link" href="/">ダッシュボード</a></li>
             <li class="nav-item"><a class="nav-link" href="/inventory">在庫一覧</a></li>
             <li class="nav-item"><a class="nav-link" href="/stocktaking">棚卸</a></li>
-            <li class="nav-item"><a class="nav-link" href="/excel_import">Excel取込</a></li>
-            <li class="nav-item"><a class="nav-link" href="/excel_export">Excel出力</a></li>
+            {% if is_admin %}
+              <li class="nav-item"><a class="nav-link" href="/excel_import">Excel取込</a></li>
+              <li class="nav-item"><a class="nav-link" href="/excel_export">Excel出力</a></li>
+            {% endif %}
           </ul>
+          {% if current_user %}
+            <div class="d-flex align-items-center gap-2 text-white">
+              <small>{{ current_user.username }} / {{ '管理者' if current_user.role == 'admin' else '一般' }}</small>
+              <a class="btn btn-sm btn-outline-light" href="{{ url_for('logout') }}">ログアウト</a>
+            </div>
+          {% endif %}
         </div>
       </div>
     </nav>

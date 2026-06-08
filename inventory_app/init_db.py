@@ -1,10 +1,12 @@
-import sqlite3
+import os
 import sys
-from pathlib import Path
 from datetime import datetime
+from werkzeug.security import generate_password_hash
 
-BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = BASE_DIR / "inventory.db"
+try:
+    from .db import column_names, get_database_url, get_db_connection, sql_type
+except ImportError:
+    from db import column_names, get_database_url, get_db_connection, sql_type
 
 PRODUCT_COLUMNS = {
     "source_sheet": "TEXT",
@@ -28,19 +30,36 @@ STOCK_LOG_COLUMNS = {
 
 
 def ensure_product_columns(cursor):
-    cursor.execute("PRAGMA table_info(products)")
-    existing = {row[1] for row in cursor.fetchall()}
+    existing = column_names("products")
     for name, definition in PRODUCT_COLUMNS.items():
         if name not in existing:
             cursor.execute(f"ALTER TABLE products ADD COLUMN {name} {definition}")
 
 
 def ensure_stock_log_columns(cursor):
-    cursor.execute("PRAGMA table_info(stock_logs)")
-    existing = {row[1] for row in cursor.fetchall()}
+    existing = column_names("stock_logs")
     for name, definition in STOCK_LOG_COLUMNS.items():
         if name not in existing:
             cursor.execute(f"ALTER TABLE stock_logs ADD COLUMN {name} {definition}")
+
+
+def ensure_user(username, password, role):
+    if not username or not password:
+        return False
+    conn = get_db_connection()
+    try:
+        existing = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+        if existing:
+            return False
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        conn.execute(
+            "INSERT INTO users (username, password_hash, role, created_at) VALUES (?, ?, ?, ?)",
+            (username, generate_password_hash(password), role, now),
+        )
+        conn.commit()
+        return True
+    finally:
+        conn.close()
 
 PRODUCTS = []
 
@@ -48,15 +67,13 @@ LOGS = []
 
 
 def create_db(reset=False):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
-    cursor.execute("PRAGMA foreign_keys = ON;")
+    conn = get_db_connection()
+    cursor = conn
 
     cursor.execute(
-        """
+        f"""
         CREATE TABLE IF NOT EXISTS products (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {sql_type("pk")},
             source_sheet TEXT,
             source_row INTEGER,
             big_category TEXT,
@@ -88,9 +105,9 @@ def create_db(reset=False):
     ensure_product_columns(cursor)
 
     cursor.execute(
-        """
+        f"""
         CREATE TABLE IF NOT EXISTS stock_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {sql_type("pk")},
             product_id INTEGER NOT NULL,
             operation_type TEXT NOT NULL,
             quantity INTEGER NOT NULL,
@@ -105,9 +122,9 @@ def create_db(reset=False):
     ensure_stock_log_columns(cursor)
 
     cursor.execute(
-        """
+        f"""
         CREATE TABLE IF NOT EXISTS low_stock_alerts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {sql_type("pk")},
             product_id INTEGER NOT NULL UNIQUE,
             threshold INTEGER NOT NULL DEFAULT 0,
             FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE
@@ -115,20 +132,31 @@ def create_db(reset=False):
         """
     )
     cursor.execute(
-        """
+        f"""
         CREATE TABLE IF NOT EXISTS zero_stock_alerts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {sql_type("pk")},
             product_id INTEGER NOT NULL UNIQUE,
             FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE
         )
         """
     )
     cursor.execute(
-        """
+        f"""
         CREATE TABLE IF NOT EXISTS stagnant_stock_alerts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {sql_type("pk")},
             product_id INTEGER NOT NULL UNIQUE,
             FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE
+        )
+        """
+    )
+    cursor.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS users (
+            id {sql_type("pk")},
+            username TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'user',
+            created_at TEXT NOT NULL
         )
         """
     )
@@ -136,6 +164,9 @@ def create_db(reset=False):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     if reset:
+        cursor.execute("DELETE FROM low_stock_alerts")
+        cursor.execute("DELETE FROM zero_stock_alerts")
+        cursor.execute("DELETE FROM stagnant_stock_alerts")
         cursor.execute("DELETE FROM stock_logs")
         cursor.execute("DELETE FROM products")
 
@@ -154,10 +185,12 @@ def create_db(reset=False):
 
     conn.commit()
     conn.close()
+    ensure_user(os.getenv("ADMIN_USERNAME"), os.getenv("ADMIN_PASSWORD"), "admin")
+    ensure_user(os.getenv("USER_USERNAME"), os.getenv("USER_PASSWORD"), "user")
     if reset:
-        print(f"データベースをリセットしました: {DB_PATH}")
+        print(f"データベースをリセットしました: {get_database_url()}")
     else:
-        print(f"データベースを確認しました: {DB_PATH}")
+        print(f"データベースを確認しました: {get_database_url()}")
 
 
 if __name__ == "__main__":

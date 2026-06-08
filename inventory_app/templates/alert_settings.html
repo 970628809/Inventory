@@ -2,7 +2,7 @@
 {% block content %}
   <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-      <h1>{{ '低在庫アラート設定' if alert_type == 'low_stock' else '在庫0アラート設定' }}</h1>
+      <h1>{{ '低在庫アラート' if alert_type == 'low_stock' else '在庫0アラート' }}</h1>
       <p class="text-muted mb-0">
         {% if alert_type == 'low_stock' %}
           監視する商品と最低在庫を登録してください。現在の在庫が設定値以下のときにアラートになります。
@@ -56,7 +56,9 @@
                       <th class="text-center">最低在庫</th>
                     {% endif %}
                     <th class="text-center">現在</th>
-                    <th class="text-center">操作</th>
+                    {% if is_admin %}
+                      <th class="text-center">操作</th>
+                    {% endif %}
                   </tr>
                 </thead>
                 <tbody>
@@ -68,13 +70,15 @@
                         <td class="text-center"><strong>{{ product.threshold }}</strong></td>
                       {% endif %}
                       <td class="text-center"><strong>{{ product.current_stock }}</strong></td>
-                      <td class="text-center">
-                        <form method="post" class="d-inline">
-                          <input type="hidden" name="action" value="remove_{{ alert_type }}">
-                          <input type="hidden" name="product_id" value="{{ product.alert_product_id }}">
-                          <button type="submit" class="btn btn-sm btn-outline-danger">削除</button>
-                        </form>
-                      </td>
+                      {% if is_admin %}
+                        <td class="text-center">
+                          <form method="post" class="d-inline">
+                            <input type="hidden" name="action" value="remove_{{ alert_type }}">
+                            <input type="hidden" name="product_id" value="{{ product.alert_product_id }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">削除</button>
+                          </form>
+                        </td>
+                      {% endif %}
                     </tr>
                   {% endfor %}
                 </tbody>
@@ -102,7 +106,9 @@
                     <th>品番</th>
                     <th>商品名</th>
                     <th class="text-center">現在</th>
-                    <th class="text-center">{% if alert_type == 'low_stock' %}最低在庫 / 追加{% else %}追加{% endif %}</th>
+                    {% if is_admin %}
+                      <th class="text-center">{% if alert_type == 'low_stock' %}最低在庫 / 追加{% else %}追加{% endif %}</th>
+                    {% endif %}
                   </tr>
                 </thead>
                 <tbody>
@@ -111,32 +117,34 @@
                       <td><code>{{ product.sku }}</code></td>
                       <td>{{ product.name }}</td>
                       <td class="text-center"><strong>{{ product.current_stock }}</strong></td>
-                      <td class="text-center">
-                        {% if product.id in selected_product_ids %}
-                          <span class="badge bg-secondary">追加済</span>
-                        {% else %}
-                          {% if alert_type == 'low_stock' %}
-                            <form method="post" class="d-flex justify-content-center gap-2 align-items-center">
-                              <input type="hidden" name="action" value="add_low_stock">
-                              <input type="hidden" name="product_id" value="{{ product.id }}">
-                              <input type="number" name="threshold" class="form-control form-control-sm" value="{{ product.reorder_point or 0 }}" min="0" style="width: 5rem;">
-                              <button type="submit" class="btn btn-sm btn-outline-primary">追加</button>
-                            </form>
-                          {% elif alert_type == 'zero_stock' %}
-                            <form method="post">
-                              <input type="hidden" name="product_id" value="{{ product.id }}">
-                              <input type="hidden" name="action" value="add_zero_stock">
-                              <button type="submit" class="btn btn-sm btn-outline-primary">追加</button>
-                            </form>
+                      {% if is_admin %}
+                        <td class="text-center">
+                          {% if product.id in selected_product_ids %}
+                            <span class="badge bg-secondary">追加済</span>
                           {% else %}
-                            <form method="post">
-                              <input type="hidden" name="product_id" value="{{ product.id }}">
-                              <input type="hidden" name="action" value="add_stagnant_stock">
-                              <button type="submit" class="btn btn-sm btn-outline-primary">追加</button>
-                            </form>
+                            {% if alert_type == 'low_stock' %}
+                              <form method="post" class="d-flex justify-content-center gap-2 align-items-center">
+                                <input type="hidden" name="action" value="add_low_stock">
+                                <input type="hidden" name="product_id" value="{{ product.id }}">
+                                <input type="number" name="threshold" class="form-control form-control-sm" value="{{ product.reorder_point or 0 }}" min="0" style="width: 5rem;">
+                                <button type="submit" class="btn btn-sm btn-outline-primary">追加</button>
+                              </form>
+                            {% elif alert_type == 'zero_stock' %}
+                              <form method="post">
+                                <input type="hidden" name="product_id" value="{{ product.id }}">
+                                <input type="hidden" name="action" value="add_zero_stock">
+                                <button type="submit" class="btn btn-sm btn-outline-primary">追加</button>
+                              </form>
+                            {% else %}
+                              <form method="post">
+                                <input type="hidden" name="product_id" value="{{ product.id }}">
+                                <input type="hidden" name="action" value="add_stagnant_stock">
+                                <button type="submit" class="btn btn-sm btn-outline-primary">追加</button>
+                              </form>
+                            {% endif %}
                           {% endif %}
-                        {% endif %}
-                      </td>
+                        </td>
+                      {% endif %}
                     </tr>
                   {% endfor %}
                 </tbody>

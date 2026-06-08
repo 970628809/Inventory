@@ -1,19 +1,25 @@
 import json
 import os
 from io import BytesIO
-from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file
-import sqlite3
+from functools import wraps
+from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file, g
 from pathlib import Path
 from datetime import datetime, timedelta
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from markupsafe import Markup, escape
+from werkzeug.security import check_password_hash, generate_password_hash
+
+try:
+    from .db import column_names, get_db_connection, sql_type, table_exists
+except ImportError:
+    from db import column_names, get_db_connection, sql_type, table_exists
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "inventory.db"
 
 app = Flask(__name__)
-app.secret_key = "inventory-secret-key"
+app.secret_key = os.getenv("SECRET_KEY", "dev-inventory-secret-key")
 
 OPERATION_LABELS = {
     "inbound": "入庫",
@@ -42,87 +48,117 @@ STOCK_LOG_COLUMNS = {
     "metadata_json": "TEXT",
 }
 
+USER_COLUMNS = {
+    "username": "TEXT NOT NULL UNIQUE",
+    "password_hash": "TEXT NOT NULL",
+    "role": "TEXT NOT NULL DEFAULT 'user'",
+    "created_at": "TEXT NOT NULL",
+}
+
 
 def ensure_product_columns(conn):
-    cursor = conn.cursor()
-    cursor.execute("PRAGMA table_info(products)")
-    existing_columns = {row[1] for row in cursor.fetchall()}
+    existing_columns = column_names("products")
     for name, definition in PRODUCT_COLUMNS.items():
         if name not in existing_columns:
-            cursor.execute(f"ALTER TABLE products ADD COLUMN {name} {definition}")
+            conn.execute(f"ALTER TABLE products ADD COLUMN {name} {definition}")
     conn.commit()
 
 
 def ensure_stock_log_columns(conn):
-    cursor = conn.cursor()
-    cursor.execute("PRAGMA table_info(stock_logs)")
-    existing_columns = {row[1] for row in cursor.fetchall()}
+    existing_columns = column_names("stock_logs")
     for name, definition in STOCK_LOG_COLUMNS.items():
         if name not in existing_columns:
-            cursor.execute(f"ALTER TABLE stock_logs ADD COLUMN {name} {definition}")
+            conn.execute(f"ALTER TABLE stock_logs ADD COLUMN {name} {definition}")
     conn.commit()
 
 
 def ensure_alert_tables(conn):
-    cursor = conn.cursor()
-    cursor.execute(
+    conn.execute(
         """
         CREATE TABLE IF NOT EXISTS low_stock_alerts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {pk},
             product_id INTEGER NOT NULL UNIQUE,
             threshold INTEGER NOT NULL DEFAULT 0,
             FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE
         )
-        """
+        """.format(pk=sql_type("pk"))
     )
-    cursor.execute(
+    conn.execute(
         """
         CREATE TABLE IF NOT EXISTS zero_stock_alerts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {pk},
             product_id INTEGER NOT NULL UNIQUE,
             FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE
         )
-        """
+        """.format(pk=sql_type("pk"))
     )
-    cursor.execute(
+    conn.execute(
         """
         CREATE TABLE IF NOT EXISTS stagnant_stock_alerts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {pk},
             product_id INTEGER NOT NULL UNIQUE,
             FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE
         )
+        """.format(pk=sql_type("pk"))
+    )
+    conn.commit()
+
+
+def ensure_user_table(conn):
+    conn.execute(
         """
+        CREATE TABLE IF NOT EXISTS users (
+            id {pk},
+            username TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'user',
+            created_at TEXT NOT NULL
+        )
+        """.format(pk=sql_type("pk"))
+    )
+    conn.commit()
+
+
+def ensure_initial_admin(conn):
+    username = os.getenv("ADMIN_USERNAME")
+    password = os.getenv("ADMIN_PASSWORD")
+    if not username or not password:
+        return
+    existing = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+    if existing:
+        return
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn.execute(
+        "INSERT INTO users (username, password_hash, role, created_at) VALUES (?, ?, ?, ?)",
+        (username, generate_password_hash(password), "admin", now),
     )
     conn.commit()
 
 
 def ensure_database():
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection()
     try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='products'")
-        if cursor.fetchone():
+        if table_exists("products"):
             ensure_product_columns(conn)
             ensure_stock_log_columns(conn)
             ensure_alert_tables(conn)
         else:
             conn.close()
             conn = None
-            from init_db import create_db
+            try:
+                from .init_db import create_db
+            except ImportError:
+                from init_db import create_db
             create_db()
-            return
+            conn = get_db_connection()
+        ensure_user_table(conn)
+        ensure_initial_admin(conn)
     finally:
         if conn:
             conn.close()
 
 
 ensure_database()
-
-
-def get_db_connection():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
 
 
 def format_staff_stock_display(staff_stock_json):
@@ -144,6 +180,82 @@ def format_staff_stock_display(staff_stock_json):
 
 
 app.jinja_env.filters['format_staff_stock'] = format_staff_stock_display
+
+
+@app.before_request
+def load_current_user():
+    g.user = None
+    user_id = session.get("user_id")
+    if not user_id:
+        return
+    conn = get_db_connection()
+    try:
+        g.user = conn.execute(
+            "SELECT id, username, role FROM users WHERE id = ?",
+            (user_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+
+@app.context_processor
+def inject_auth_context():
+    return {
+        "current_user": g.get("user"),
+        "is_admin": bool(g.get("user") and g.user["role"] == "admin"),
+    }
+
+
+def login_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if g.get("user") is None:
+            return redirect(url_for("login", next=request.full_path))
+        return view(*args, **kwargs)
+    return wrapped
+
+
+def admin_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if g.get("user") is None:
+            return redirect(url_for("login", next=request.full_path))
+        if g.user["role"] != "admin":
+            flash("管理者権限が必要です。", "danger")
+            return redirect(url_for("dashboard"))
+        return view(*args, **kwargs)
+    return wrapped
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if g.get("user"):
+        return redirect(url_for("dashboard"))
+
+    error_message = None
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        conn = get_db_connection()
+        try:
+            user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+        finally:
+            conn.close()
+        if user and check_password_hash(user["password_hash"], password):
+            session.clear()
+            session["user_id"] = user["id"]
+            session["role"] = user["role"]
+            return redirect(request.args.get("next") or url_for("dashboard"))
+        error_message = "ユーザー名またはパスワードが正しくありません。"
+
+    return render_template("login.html", error_message=error_message)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    flash("ログアウトしました。", "success")
+    return redirect(url_for("login"))
 
 
 def parse_search_args():
@@ -654,6 +766,7 @@ def export_monthly_changes_file(target_date=None):
 
 
 @app.route("/")
+@login_required
 def dashboard():
     conn = get_db_connection()
     today = datetime.today().date()
@@ -688,6 +801,7 @@ def dashboard():
 
 
 @app.route("/alerts/<alert_type>", methods=["GET", "POST"])
+@login_required
 def alert_settings(alert_type):
     if alert_type not in ["low_stock", "zero_stock", "stagnant_stock"]:
         return "指定されたアラートタイプが無効です。", 404
@@ -696,6 +810,10 @@ def alert_settings(alert_type):
     conn = get_db_connection()
 
     if request.method == "POST":
+        if g.user["role"] != "admin":
+            conn.close()
+            flash("管理者権限が必要です。", "danger")
+            return redirect(url_for("alert_settings", alert_type=alert_type, **params))
         action = request.form.get("action")
         product_id = request.form.get("product_id", type=int)
 
@@ -778,6 +896,7 @@ def alert_settings(alert_type):
 
 
 @app.route("/stock/log/edit/<int:log_id>", methods=["GET", "POST"])
+@admin_required
 def edit_stock_log(log_id):
     params = parse_search_args()
     selected_product_id = request.args.get("selected_product_id", type=int)
@@ -957,9 +1076,10 @@ def edit_stock_log(log_id):
 
 
 @app.route("/inventory")
+@login_required
 def inventory():
     params = parse_search_args()
-    edit_mode = request.args.get("edit") == "1"
+    edit_mode = g.user["role"] == "admin" and request.args.get("edit") == "1"
     sql, values = build_product_query(params)
     conn = get_db_connection()
     products = conn.execute(sql, values).fetchall()
@@ -981,6 +1101,7 @@ def inventory():
 
 
 @app.route("/inventory/new", methods=["GET", "POST"])
+@admin_required
 def inventory_new():
     conn = get_db_connection()
     options = get_inventory_form_options(conn)
@@ -1070,6 +1191,7 @@ def inventory_new():
 
 
 @app.route("/inventory/edit/<int:product_id>", methods=["GET", "POST"])
+@admin_required
 def inventory_edit(product_id):
     conn = get_db_connection()
     product = conn.execute("SELECT * FROM products WHERE id = ?", (product_id,)).fetchone()
@@ -1199,6 +1321,7 @@ def inventory_edit(product_id):
 
 
 @app.route("/stocktaking")
+@login_required
 def stocktaking():
     params = parse_search_args()
     sql, values = build_product_query(params)
@@ -1220,6 +1343,7 @@ def stocktaking():
 
 
 @app.route("/stocktaking/start", methods=["POST"])
+@admin_required
 def stocktaking_start():
     session["stocktaking_started"] = True
     session["stocktaking_checked_ids"] = []
@@ -1228,6 +1352,7 @@ def stocktaking_start():
 
 
 @app.route("/stocktaking/end", methods=["POST"])
+@admin_required
 def stocktaking_end():
     session["stocktaking_started"] = False
     session["stocktaking_checked_ids"] = []
@@ -1236,6 +1361,7 @@ def stocktaking_end():
 
 
 @app.route("/stocktaking/check/<int:product_id>", methods=["POST"])
+@admin_required
 def stocktaking_check(product_id):
     conn = get_db_connection()
     product = conn.execute("SELECT id FROM products WHERE id = ?", (product_id,)).fetchone()
@@ -1250,6 +1376,7 @@ def stocktaking_check(product_id):
 
 
 @app.route("/stocktaking/edit/<int:product_id>", methods=["GET", "POST"])
+@admin_required
 def stocktaking_edit(product_id):
     conn = get_db_connection()
     product = conn.execute("SELECT * FROM products WHERE id = ?", (product_id,)).fetchone()
@@ -1290,6 +1417,7 @@ def stocktaking_edit(product_id):
 
 
 @app.route("/excel_import", methods=["GET", "POST"])
+@admin_required
 def excel_import():
     result = None
     if request.method == "POST":
@@ -1309,11 +1437,13 @@ def excel_import():
 
 
 @app.route("/excel_export")
+@admin_required
 def excel_export():
     return render_template("excel_export.html")
 
 
 @app.route("/monthly_changes_export")
+@admin_required
 def monthly_changes_export():
     output, start = export_monthly_changes_file()
     filename = f"monthly_changes_{start.strftime('%Y_%m')}.xlsx"
@@ -1326,6 +1456,7 @@ def monthly_changes_export():
 
 
 @app.route("/stock/operate/<int:product_id>", methods=["GET", "POST"])
+@admin_required
 def stock_operate(product_id):
     operation_type = request.args.get("type", "inbound")
     if operation_type not in ["inbound", "outbound", "adjustment", "modification"]:

@@ -25,13 +25,13 @@
                 {% if zero_stock %}
                   <div class="list-group list-group-flush">
                     {% for product in zero_stock %}
-                      <a href="{{ url_for('stock_operate', product_id=product.id, type='inbound') }}" class="list-group-item list-group-item-action">
+                      <a href="{{ url_for('stock_operate', product_id=product.id, type='inbound') if is_admin else url_for('inventory', sku=product.sku) }}" class="list-group-item list-group-item-action">
                         <div class="d-flex justify-content-between align-items-center">
                           <div>
                             <strong>{{ product.sku }}</strong> - {{ product.name }}
                             <br><small class="text-muted">{{ product.big_category }}</small>
                           </div>
-                          <span class="badge bg-danger">入庫</span>
+                          <span class="badge bg-danger">{{ '入庫' if is_admin else '確認' }}</span>
                         </div>
                       </a>
                     {% endfor %}
@@ -68,7 +68,7 @@
                 {% if low_stock %}
                   <div class="list-group list-group-flush">
                     {% for product in low_stock %}
-                      <a href="{{ url_for('stock_operate', product_id=product.id, type='inbound') }}" class="list-group-item list-group-item-action">
+                      <a href="{{ url_for('stock_operate', product_id=product.id, type='inbound') if is_admin else url_for('inventory', sku=product.sku) }}" class="list-group-item list-group-item-action">
                         <div class="d-flex justify-content-between align-items-center">
                           <div>
                             <strong>{{ product.sku }}</strong> - {{ product.name }}
@@ -112,13 +112,13 @@
                 {% if stagnant_stock %}
                   <div class="list-group list-group-flush">
                     {% for product in stagnant_stock %}
-                      <a href="{{ url_for('stock_operate', product_id=product.id, type='outbound') }}" class="list-group-item list-group-item-action">
+                      <a href="{{ url_for('stock_operate', product_id=product.id, type='outbound') if is_admin else url_for('inventory', sku=product.sku) }}" class="list-group-item list-group-item-action">
                         <div class="d-flex justify-content-between align-items-center">
                           <div>
                             <strong>{{ product.sku }}</strong> - {{ product.name }}
                             <br><small class="text-muted">最終出庫: {{ product.last_out_date }}</small>
                           </div>
-                          <span class="badge bg-info">出庫</span>
+                          <span class="badge bg-info">{{ '出庫' if is_admin else '確認' }}</span>
                         </div>
                       </a>
                     {% endfor %}
@@ -154,7 +154,9 @@
                   <th class="text-center">数量</th>
                   <th>担当</th>
                   <th>メモ</th>
-                  <th class="text-center">編集</th>
+                  {% if is_admin %}
+                    <th class="text-center">編集</th>
+                  {% endif %}
                 </tr>
               </thead>
               <tbody>
@@ -179,9 +181,11 @@
                     <td class="text-center"><strong>{{ log.quantity }}</strong></td>
                     <td><small>{{ log.staff_name }}</small></td>
                     <td><small>{{ log.note }}</small></td>
-                    <td class="text-center">
-                      <a href="{{ url_for('edit_stock_log', log_id=log.id) }}" class="btn btn-sm btn-outline-primary">編集</a>
-                    </td>
+                    {% if is_admin %}
+                      <td class="text-center">
+                        <a href="{{ url_for('edit_stock_log', log_id=log.id) }}" class="btn btn-sm btn-outline-primary">編集</a>
+                      </td>
+                    {% endif %}
                   </tr>
                 {% endfor %}
               </tbody>
