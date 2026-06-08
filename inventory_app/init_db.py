@@ -12,12 +12,18 @@ PRODUCT_COLUMNS = {
     "big_category": "TEXT",
     "maker_or_product": "TEXT",
     "overview": "TEXT",
+    "supplier": "TEXT",
+    "amount": "TEXT",
     "stock_status": "TEXT",
     "display_flag": "TEXT",
     "available_stock": "INTEGER NOT NULL DEFAULT 0",
     "total_stock": "INTEGER NOT NULL DEFAULT 0",
     "staff_stock_json": "TEXT",
     "imported_at": "TEXT",
+}
+
+STOCK_LOG_COLUMNS = {
+    "metadata_json": "TEXT",
 }
 
 
@@ -27,6 +33,14 @@ def ensure_product_columns(cursor):
     for name, definition in PRODUCT_COLUMNS.items():
         if name not in existing:
             cursor.execute(f"ALTER TABLE products ADD COLUMN {name} {definition}")
+
+
+def ensure_stock_log_columns(cursor):
+    cursor.execute("PRAGMA table_info(stock_logs)")
+    existing = {row[1] for row in cursor.fetchall()}
+    for name, definition in STOCK_LOG_COLUMNS.items():
+        if name not in existing:
+            cursor.execute(f"ALTER TABLE stock_logs ADD COLUMN {name} {definition}")
 
 PRODUCTS = []
 
@@ -82,11 +96,13 @@ def create_db(reset=False):
             quantity INTEGER NOT NULL,
             staff_name TEXT,
             note TEXT,
+            metadata_json TEXT,
             created_at TEXT NOT NULL,
             FOREIGN KEY(product_id) REFERENCES products(id)
         )
         """
     )
+    ensure_stock_log_columns(cursor)
 
     cursor.execute(
         """
@@ -126,8 +142,8 @@ def create_db(reset=False):
     if reset or not cursor.execute("SELECT 1 FROM products LIMIT 1").fetchone():
         for row_number, (sku, name, category, location, current_stock, reorder_point, last_in_date, last_out_date, notes) in enumerate(PRODUCTS, start=1):
             cursor.execute(
-                "INSERT INTO products (source_sheet, source_row, big_category, maker_or_product, overview, sku, stock_status, display_flag, available_stock, total_stock, reorder_point, staff_stock_json, notes, imported_at, current_stock, name, category, location, last_in_date, last_out_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                ("sample", row_number, category or "", name, "", sku, "", "", current_stock, current_stock, reorder_point, "{}", notes, now, current_stock, name, category, location, last_in_date, last_out_date, now, now),
+                "INSERT INTO products (source_sheet, source_row, big_category, maker_or_product, overview, supplier, amount, sku, stock_status, display_flag, available_stock, total_stock, reorder_point, staff_stock_json, notes, imported_at, current_stock, name, category, location, last_in_date, last_out_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                ("sample", row_number, category or "", name, "", "", "", sku, "", "", current_stock, current_stock, reorder_point, "{}", notes, now, current_stock, name, category, location, last_in_date, last_out_date, now, now),
             )
 
         for product_id, operation_type, quantity, staff_name, note, created_at in LOGS:

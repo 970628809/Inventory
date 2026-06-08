@@ -28,12 +28,18 @@ PRODUCT_COLUMNS = {
     "big_category": "TEXT",
     "maker_or_product": "TEXT",
     "overview": "TEXT",
+    "supplier": "TEXT",
+    "amount": "TEXT",
     "stock_status": "TEXT",
     "display_flag": "TEXT",
     "available_stock": "INTEGER NOT NULL DEFAULT 0",
     "total_stock": "INTEGER NOT NULL DEFAULT 0",
     "staff_stock_json": "TEXT",
     "imported_at": "TEXT",
+}
+
+STOCK_LOG_COLUMNS = {
+    "metadata_json": "TEXT",
 }
 
 
@@ -44,6 +50,16 @@ def ensure_product_columns(conn):
     for name, definition in PRODUCT_COLUMNS.items():
         if name not in existing_columns:
             cursor.execute(f"ALTER TABLE products ADD COLUMN {name} {definition}")
+    conn.commit()
+
+
+def ensure_stock_log_columns(conn):
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA table_info(stock_logs)")
+    existing_columns = {row[1] for row in cursor.fetchall()}
+    for name, definition in STOCK_LOG_COLUMNS.items():
+        if name not in existing_columns:
+            cursor.execute(f"ALTER TABLE stock_logs ADD COLUMN {name} {definition}")
     conn.commit()
 
 
@@ -87,6 +103,7 @@ def ensure_database():
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='products'")
         if cursor.fetchone():
             ensure_product_columns(conn)
+            ensure_stock_log_columns(conn)
             ensure_alert_tables(conn)
         else:
             conn.close()
@@ -189,6 +206,21 @@ def parse_staff_stock_form():
     return staff_stock
 
 
+def staff_stock_form_rows(staff_stock_json=None, min_rows=3):
+    rows = []
+    if staff_stock_json:
+        try:
+            rows = [
+                {"name": name, "quantity": quantity}
+                for name, quantity in json.loads(staff_stock_json).items()
+            ]
+        except Exception:
+            rows = []
+    while len(rows) < min_rows:
+        rows.append({"name": "", "quantity": ""})
+    return rows
+
+
 def adjust_staff_sales_json(staff_stock_json, staff_name, delta):
     if not staff_name or delta == 0:
         return staff_stock_json or "{}"
@@ -199,6 +231,43 @@ def adjust_staff_sales_json(staff_stock_json, staff_name, delta):
     current = parse_int(data.get(staff_name, 0))
     data[staff_name] = max(0, current + delta)
     return json.dumps(data, ensure_ascii=False)
+
+
+PRODUCT_SNAPSHOT_FIELDS = [
+    "source_sheet",
+    "big_category",
+    "maker_or_product",
+    "overview",
+    "supplier",
+    "amount",
+    "sku",
+    "available_stock",
+    "current_stock",
+    "total_stock",
+    "staff_stock_json",
+    "notes",
+    "name",
+    "category",
+    "location",
+]
+
+
+def product_snapshot(product):
+    return {field: product[field] for field in PRODUCT_SNAPSHOT_FIELDS if field in product.keys()}
+
+
+def restore_product_snapshot(conn, product_id, snapshot):
+    fields = [field for field in PRODUCT_SNAPSHOT_FIELDS if field in snapshot]
+    if not fields:
+        return False
+    assignments = ", ".join([f"{field} = ?" for field in fields])
+    values = [snapshot[field] for field in fields]
+    values.extend([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), product_id])
+    conn.execute(
+        f"UPDATE products SET {assignments}, updated_at = ? WHERE id = ?",
+        values,
+    )
+    return True
 
 
 def get_inventory_form_options(conn):
@@ -281,6 +350,8 @@ def parse_inventory_row(sheet, sheet_name, row):
         sku = str(get_cell(sheet, row, 6)).strip()
         display_flag = str(get_cell(sheet, row, 7)).strip()
         available_stock = parse_int(get_cell(sheet, row, 8))
+        supplier = str(get_cell(sheet, row, 9)).strip()
+        amount = str(get_cell(sheet, row, 10)).strip()
         total_stock = parse_int(get_cell(sheet, row, 12))
         notes = str(get_cell(sheet, row, 27)).strip()
         staff_stock = parse_staff_stock(sheet, row)
@@ -300,6 +371,8 @@ def parse_inventory_row(sheet, sheet_name, row):
             "big_category": big_category,
             "maker_or_product": maker_or_product,
             "overview": overview,
+            "supplier": supplier,
+            "amount": amount,
             "sku": sku,
             "stock_status": stock_status,
             "display_flag": display_flag,
@@ -321,6 +394,8 @@ def parse_inventory_row(sheet, sheet_name, row):
         maker_or_product = str(get_cell(sheet, row, 8)).strip()
         overview = str(get_cell(sheet, row, 7)).strip()
         sku = str(get_cell(sheet, row, 9)).strip()
+        supplier = str(get_cell(sheet, row, 10)).strip()
+        amount = str(get_cell(sheet, row, 11)).strip()
         notes = str(get_cell(sheet, row, 20)).strip()
         big_category = str(get_cell(sheet, row, 6)).strip()
 
@@ -334,6 +409,8 @@ def parse_inventory_row(sheet, sheet_name, row):
             "big_category": big_category,
             "maker_or_product": maker_or_product,
             "overview": overview,
+            "supplier": supplier,
+            "amount": amount,
             "sku": sku,
             "stock_status": stock_status,
             "display_flag": "",
@@ -385,13 +462,15 @@ def import_excel_file(file_stream):
                         continue
                     
                     conn.execute(
-                        "INSERT INTO products (source_sheet, source_row, big_category, maker_or_product, overview, sku, stock_status, display_flag, available_stock, total_stock, reorder_point, staff_stock_json, notes, imported_at, current_stock, name, category, location, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "INSERT INTO products (source_sheet, source_row, big_category, maker_or_product, overview, supplier, amount, sku, stock_status, display_flag, available_stock, total_stock, reorder_point, staff_stock_json, notes, imported_at, current_stock, name, category, location, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         (
                             record["source_sheet"],
                             record["source_row"],
                             record["big_category"],
                             record["maker_or_product"],
                             record["overview"],
+                            record["supplier"],
+                            record["amount"],
                             record["sku"],
                             record["stock_status"],
                             record["display_flag"],
@@ -736,23 +815,42 @@ def edit_stock_log(log_id):
     if request.method == "POST":
         action = request.form.get("action", "save")
         if action == "delete_log":
-            old_delta = compute_stock_delta(log["operation_type"], log["quantity"])
-            new_stock = old_product["current_stock"] - old_delta
-            staff_stock_json = old_product["staff_stock_json"]
-            if log["operation_type"] == "outbound":
-                staff_stock_json = adjust_staff_sales_json(
-                    staff_stock_json,
-                    log["staff_name"],
-                    -abs(log["quantity"]),
+            restored_snapshot = False
+            metadata = {}
+            if log["metadata_json"]:
+                try:
+                    metadata = json.loads(log["metadata_json"])
+                except Exception:
+                    metadata = {}
+
+            if log["operation_type"] == "modification" and metadata.get("kind") == "inventory_edit":
+                restored_snapshot = restore_product_snapshot(
+                    conn,
+                    old_product["id"],
+                    metadata.get("before", {}),
                 )
-            conn.execute(
-                "UPDATE products SET current_stock = ?, available_stock = ?, staff_stock_json = ?, updated_at = ? WHERE id = ?",
-                (new_stock, new_stock, staff_stock_json, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), old_product["id"]),
-            )
+
+            if not restored_snapshot:
+                old_delta = compute_stock_delta(log["operation_type"], log["quantity"])
+                new_stock = old_product["current_stock"] - old_delta
+                staff_stock_json = old_product["staff_stock_json"]
+                if log["operation_type"] == "outbound":
+                    staff_stock_json = adjust_staff_sales_json(
+                        staff_stock_json,
+                        log["staff_name"],
+                        -abs(log["quantity"]),
+                    )
+                conn.execute(
+                    "UPDATE products SET current_stock = ?, available_stock = ?, staff_stock_json = ?, updated_at = ? WHERE id = ?",
+                    (new_stock, new_stock, staff_stock_json, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), old_product["id"]),
+                )
             conn.execute("DELETE FROM stock_logs WHERE id = ?", (log_id,))
             conn.commit()
             conn.close()
-            flash("在庫記録を削除しました。", "success")
+            if log["operation_type"] == "modification" and not restored_snapshot:
+                flash("在庫記録を削除しました。旧形式の修正記録のため、数量だけ回復しました。", "success")
+            else:
+                flash("在庫記録を削除しました。", "success")
             return redirect(url_for("dashboard"))
 
         target_product_id = request.form.get("product_id", type=int)
@@ -861,6 +959,7 @@ def edit_stock_log(log_id):
 @app.route("/inventory")
 def inventory():
     params = parse_search_args()
+    edit_mode = request.args.get("edit") == "1"
     sql, values = build_product_query(params)
     conn = get_db_connection()
     products = conn.execute(sql, values).fetchall()
@@ -877,6 +976,7 @@ def inventory():
         products=products,
         params=params,
         big_categories=big_categories,
+        edit_mode=edit_mode,
     )
 
 
@@ -886,6 +986,7 @@ def inventory_new():
     options = get_inventory_form_options(conn)
     error_message = None
     form_data = {}
+    staff_rows = staff_stock_form_rows()
 
     if request.method == "POST":
         form_data = request.form.to_dict()
@@ -893,16 +994,17 @@ def inventory_new():
         maker_or_product = request.form.get("maker_or_product", "").strip()
         overview = request.form.get("overview", "").strip()
         sku = request.form.get("sku", "").strip()
+        supplier = request.form.get("supplier", "").strip()
+        amount = request.form.get("amount", "").strip()
         available_stock = parse_int(request.form.get("available_stock"))
         total_stock = parse_int(request.form.get("total_stock"))
         notes = request.form.get("notes", "").strip()
         source_sheet = request.form.get("source_sheet", "").strip() or "手動追加"
         staff_stock = parse_staff_stock_form()
+        staff_rows = staff_stock_form_rows(json.dumps(staff_stock, ensure_ascii=False))
 
         if not big_category:
             error_message = "大分類を入力してください。"
-        elif not maker_or_product:
-            error_message = "メーカー/商品を入力してください。"
         elif not sku:
             error_message = "品番を入力してください。"
         elif available_stock < 0 or total_stock < 0:
@@ -918,14 +1020,17 @@ def inventory_new():
                 (source_sheet,),
             ).fetchone()[0]
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            conn.execute(
-                "INSERT INTO products (source_sheet, source_row, big_category, maker_or_product, overview, sku, stock_status, display_flag, available_stock, total_stock, reorder_point, staff_stock_json, notes, imported_at, current_stock, name, category, location, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            product_name = maker_or_product or sku or overview or supplier or "不明"
+            cursor = conn.execute(
+                "INSERT INTO products (source_sheet, source_row, big_category, maker_or_product, overview, supplier, amount, sku, stock_status, display_flag, available_stock, total_stock, reorder_point, staff_stock_json, notes, imported_at, current_stock, name, category, location, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     source_sheet,
                     source_row,
                     big_category,
                     maker_or_product,
                     overview,
+                    supplier,
+                    amount,
                     sku,
                     "",
                     "",
@@ -936,12 +1041,16 @@ def inventory_new():
                     notes,
                     now,
                     available_stock,
-                    maker_or_product,
+                    product_name,
                     big_category,
                     "",
                     now,
                     now,
                 ),
+            )
+            conn.execute(
+                "INSERT INTO stock_logs (product_id, operation_type, quantity, staff_name, note, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (cursor.lastrowid, "modification", available_stock, "", "新品追加", now),
             )
             conn.commit()
             conn.close()
@@ -951,9 +1060,141 @@ def inventory_new():
     conn.close()
     return render_template(
         "inventory_new.html",
+        title="新品追加",
+        submit_label="追加する",
         options=options,
         error_message=error_message,
         form_data=form_data,
+        staff_rows=staff_rows,
+    )
+
+
+@app.route("/inventory/edit/<int:product_id>", methods=["GET", "POST"])
+def inventory_edit(product_id):
+    conn = get_db_connection()
+    product = conn.execute("SELECT * FROM products WHERE id = ?", (product_id,)).fetchone()
+    if product is None:
+        conn.close()
+        return "商品が見つかりません。", 404
+
+    options = get_inventory_form_options(conn)
+    error_message = None
+    form_data = dict(product)
+    staff_rows = staff_stock_form_rows(product["staff_stock_json"])
+
+    if request.method == "POST":
+        form_data = request.form.to_dict()
+        big_category = request.form.get("big_category", "").strip()
+        maker_or_product = request.form.get("maker_or_product", "").strip()
+        overview = request.form.get("overview", "").strip()
+        supplier = request.form.get("supplier", "").strip()
+        amount = request.form.get("amount", "").strip()
+        sku = request.form.get("sku", "").strip()
+        available_stock = parse_int(request.form.get("available_stock"))
+        total_stock = parse_int(request.form.get("total_stock"))
+        notes = request.form.get("notes", "").strip()
+        source_sheet = request.form.get("source_sheet", "").strip() or "手動追加"
+        staff_stock = parse_staff_stock_form()
+        staff_rows = staff_stock_form_rows(json.dumps(staff_stock, ensure_ascii=False))
+
+        if not big_category:
+            error_message = "大分類を入力してください。"
+        elif not sku:
+            error_message = "品番を入力してください。"
+        elif available_stock < 0 or total_stock < 0:
+            error_message = "台数は0以上で入力してください。"
+        else:
+            existing = conn.execute(
+                "SELECT id FROM products WHERE sku = ? AND id != ?",
+                (sku, product_id),
+            ).fetchone()
+            if existing:
+                error_message = "同じ品番の商品がすでにあります。"
+
+        if error_message is None:
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            stock_change = available_stock - product["current_stock"]
+            product_name = maker_or_product or sku or overview or supplier or "不明"
+            before_snapshot = product_snapshot(product)
+            after_snapshot = {
+                **before_snapshot,
+                "big_category": big_category,
+                "maker_or_product": maker_or_product,
+                "overview": overview,
+                "supplier": supplier,
+                "amount": amount,
+                "sku": sku,
+                "available_stock": available_stock,
+                "current_stock": available_stock,
+                "total_stock": total_stock,
+                "staff_stock_json": json.dumps(staff_stock, ensure_ascii=False),
+                "notes": notes,
+                "source_sheet": source_sheet,
+                "name": product_name,
+                "category": big_category,
+            }
+            conn.execute(
+                """
+                UPDATE products
+                SET big_category = ?, maker_or_product = ?, overview = ?, supplier = ?,
+                    amount = ?, sku = ?, available_stock = ?, current_stock = ?,
+                    total_stock = ?, staff_stock_json = ?, notes = ?, source_sheet = ?,
+                    name = ?, category = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    big_category,
+                    maker_or_product,
+                    overview,
+                    supplier,
+                    amount,
+                    sku,
+                    available_stock,
+                    available_stock,
+                    total_stock,
+                    json.dumps(staff_stock, ensure_ascii=False),
+                    notes,
+                    source_sheet,
+                    product_name,
+                    big_category,
+                    now,
+                    product_id,
+                ),
+            )
+            conn.execute(
+                "INSERT INTO stock_logs (product_id, operation_type, quantity, staff_name, note, created_at, metadata_json) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    product_id,
+                    "modification",
+                    stock_change,
+                    "",
+                    "在庫修正",
+                    now,
+                    json.dumps(
+                        {
+                            "kind": "inventory_edit",
+                            "before": before_snapshot,
+                            "after": after_snapshot,
+                        },
+                        ensure_ascii=False,
+                    ),
+                ),
+            )
+            conn.commit()
+            conn.close()
+            flash("在庫情報を更新しました。", "success")
+            return redirect(url_for("inventory", edit="1"))
+
+    conn.close()
+    return render_template(
+        "inventory_new.html",
+        title="在庫修正",
+        submit_label="更新する",
+        options=options,
+        error_message=error_message,
+        form_data=form_data,
+        staff_rows=staff_rows,
+        is_edit=True,
     )
 
 

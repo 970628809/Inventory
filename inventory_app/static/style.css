@@ -43,6 +43,18 @@ body {
   min-height: 100px;
 }
 
+.btn-inventory-edit {
+  --bs-btn-bg: #f0ad00;
+  --bs-btn-border-color: #f0ad00;
+  --bs-btn-color: #fff;
+  --bs-btn-hover-bg: #d99b00;
+  --bs-btn-hover-border-color: #d99b00;
+  --bs-btn-hover-color: #fff;
+  --bs-btn-active-bg: #c88f00;
+  --bs-btn-active-border-color: #c88f00;
+  --bs-btn-active-color: #fff;
+}
+
 .stocktaking-actions {
   display: inline-grid;
   grid-template-columns: repeat(2, 4rem);
@@ -64,25 +76,47 @@ td.stock-table-overview small {
   overflow: hidden;
 }
 
-.stock-table-staff {
+.stock-table-supplier {
   max-width: 7.5rem;
   width: 7.5rem;
 }
 
+.stock-table-sku {
+  max-width: 7.5rem;
+  width: 7.5rem;
+}
+
+.stock-table-amount {
+  max-width: 5.5rem;
+  width: 5.5rem;
+}
+
+.stock-table-supplier small,
+.stock-table-sku code,
+.stock-table-amount small {
+  overflow-wrap: anywhere;
+}
+
+.stock-table-staff {
+  max-width: 11.5rem;
+  width: 11.5rem;
+}
+
+td.stock-table-staff small {
+  display: block;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+
 .stock-table-notes {
-  max-width: 9rem;
-  width: 9rem;
+  max-width: 8.5rem;
+  width: 8.5rem;
 }
 
 td.stock-table-notes small {
   display: block;
   max-height: 2.5rem;
   overflow: hidden;
-}
-
-.stock-table-source {
-  min-width: 6.5rem;
-  white-space: nowrap;
 }
 
 .stock-table thead th {
