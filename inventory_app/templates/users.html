@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="mb-0">ユーザー管理</h1>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">戻る</a>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-bordered table-hover align-middle">
+      <thead class="table-dark">
+        <tr>
+          <th>ユーザー名</th>
+          <th class="text-center">権限</th>
+          <th class="text-center">状態</th>
+          <th class="text-center">管理者希望</th>
+          <th>作成日時</th>
+          <th class="text-center">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for user in users %}
+          <tr>
+            <td><strong>{{ user.username }}</strong></td>
+            <td class="text-center">
+              <span class="badge {% if user.role == 'admin' %}bg-primary{% else %}bg-secondary{% endif %}">
+                {{ '管理者' if user.role == 'admin' else '一般' }}
+              </span>
+            </td>
+            <td class="text-center">
+              <span class="badge {% if user.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                {{ '有効' if user.is_active else '無効' }}
+              </span>
+            </td>
+            <td class="text-center">
+              {% if user.admin_requested and user.role != 'admin' %}
+                <span class="badge bg-warning text-dark">希望あり</span>
+              {% else %}
+                <span class="text-muted">-</span>
+              {% endif %}
+            </td>
+            <td><small>{{ user.created_at }}</small></td>
+            <td>
+              <div class="d-flex flex-wrap justify-content-center gap-2">
+                {% if user.role == 'admin' %}
+                  <form method="post">
+                    <input type="hidden" name="user_id" value="{{ user.id }}">
+                    <button type="submit" name="action" value="make_user" class="btn btn-sm btn-outline-secondary">一般にする</button>
+                  </form>
+                {% else %}
+                  <form method="post">
+                    <input type="hidden" name="user_id" value="{{ user.id }}">
+                    <button type="submit" name="action" value="make_admin" class="btn btn-sm btn-outline-primary">管理者にする</button>
+                  </form>
+                {% endif %}
+
+                {% if user.is_active %}
+                  <form method="post">
+                    <input type="hidden" name="user_id" value="{{ user.id }}">
+                    <button type="submit" name="action" value="deactivate" class="btn btn-sm btn-outline-danger">無効</button>
+                  </form>
+                {% else %}
+                  <form method="post">
+                    <input type="hidden" name="user_id" value="{{ user.id }}">
+                    <button type="submit" name="action" value="activate" class="btn btn-sm btn-outline-success">有効</button>
+                  </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="6" class="text-center text-muted py-4">ユーザーがありません。</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

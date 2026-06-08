@@ -52,6 +52,8 @@ USER_COLUMNS = {
     "username": "TEXT NOT NULL UNIQUE",
     "password_hash": "TEXT NOT NULL",
     "role": "TEXT NOT NULL DEFAULT 'user'",
+    "is_active": "INTEGER NOT NULL DEFAULT 1",
+    "admin_requested": "INTEGER NOT NULL DEFAULT 0",
     "created_at": "TEXT NOT NULL",
 }
 
@@ -112,10 +114,16 @@ def ensure_user_table(conn):
             username TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
             role TEXT NOT NULL DEFAULT 'user',
+            is_active INTEGER NOT NULL DEFAULT 1,
+            admin_requested INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL
         )
         """.format(pk=sql_type("pk"))
     )
+    existing_columns = column_names("users")
+    for name, definition in USER_COLUMNS.items():
+        if name not in existing_columns:
+            conn.execute(f"ALTER TABLE users ADD COLUMN {name} {definition}")
     conn.commit()
 
 
@@ -129,8 +137,8 @@ def ensure_initial_admin(conn):
         return
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     conn.execute(
-        "INSERT INTO users (username, password_hash, role, created_at) VALUES (?, ?, ?, ?)",
-        (username, generate_password_hash(password), "admin", now),
+        "INSERT INTO users (username, password_hash, role, is_active, admin_requested, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (username, generate_password_hash(password), "admin", 1, 0, now),
     )
     conn.commit()
 
@@ -241,14 +249,58 @@ def login():
             user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
         finally:
             conn.close()
-        if user and check_password_hash(user["password_hash"], password):
+        if user and not user["is_active"]:
+            error_message = "このアカウントは無効です。管理者に確認してください。"
+        elif user and check_password_hash(user["password_hash"], password):
             session.clear()
             session["user_id"] = user["id"]
             session["role"] = user["role"]
             return redirect(request.args.get("next") or url_for("dashboard"))
-        error_message = "ユーザー名またはパスワードが正しくありません。"
+        else:
+            error_message = "ユーザー名またはパスワードが正しくありません。"
 
     return render_template("login.html", error_message=error_message)
+
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if g.get("user"):
+        return redirect(url_for("dashboard"))
+
+    error_message = None
+    form_data = {}
+    if request.method == "POST":
+        form_data = request.form.to_dict()
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        password_confirm = request.form.get("password_confirm", "")
+        admin_requested = 1 if request.form.get("admin_requested") == "1" else 0
+
+        if not username:
+            error_message = "ユーザー名を入力してください。"
+        elif len(password) < 8:
+            error_message = "パスワードは8文字以上で入力してください。"
+        elif password != password_confirm:
+            error_message = "確認用パスワードが一致しません。"
+        else:
+            conn = get_db_connection()
+            try:
+                existing = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+                if existing:
+                    error_message = "同じユーザー名がすでに使われています。"
+                else:
+                    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    conn.execute(
+                        "INSERT INTO users (username, password_hash, role, is_active, admin_requested, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                        (username, generate_password_hash(password), "user", 1, admin_requested, now),
+                    )
+                    conn.commit()
+                    flash("アカウントを作成しました。ログインしてください。", "success")
+                    return redirect(url_for("login"))
+            finally:
+                conn.close()
+
+    return render_template("register.html", error_message=error_message, form_data=form_data)
 
 
 @app.route("/logout")
@@ -256,6 +308,50 @@ def logout():
     session.clear()
     flash("ログアウトしました。", "success")
     return redirect(url_for("login"))
+
+
+@app.route("/users", methods=["GET", "POST"])
+@admin_required
+def users():
+    conn = get_db_connection()
+    if request.method == "POST":
+        user_id = request.form.get("user_id", type=int)
+        action = request.form.get("action")
+        target = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        if target is None:
+            flash("ユーザーが見つかりません。", "danger")
+        elif target["id"] == g.user["id"] and action in ["deactivate", "make_user"]:
+            flash("自分自身の管理者権限や有効状態は変更できません。", "danger")
+        elif action == "make_admin":
+            conn.execute(
+                "UPDATE users SET role = ?, admin_requested = ? WHERE id = ?",
+                ("admin", 0, user_id),
+            )
+            conn.commit()
+            flash("管理者権限を付与しました。", "success")
+        elif action == "make_user":
+            conn.execute(
+                "UPDATE users SET role = ?, admin_requested = ? WHERE id = ?",
+                ("user", 0, user_id),
+            )
+            conn.commit()
+            flash("普通ユーザーに変更しました。", "success")
+        elif action == "activate":
+            conn.execute("UPDATE users SET is_active = ? WHERE id = ?", (1, user_id))
+            conn.commit()
+            flash("ユーザーを有効にしました。", "success")
+        elif action == "deactivate":
+            conn.execute("UPDATE users SET is_active = ? WHERE id = ?", (0, user_id))
+            conn.commit()
+            flash("ユーザーを無効にしました。", "success")
+        else:
+            flash("操作が無効です。", "danger")
+        conn.close()
+        return redirect(url_for("users"))
+
+    rows = conn.execute("SELECT id, username, role, is_active, admin_requested, created_at FROM users ORDER BY created_at DESC, username ASC").fetchall()
+    conn.close()
+    return render_template("users.html", users=rows)
 
 
 def parse_search_args():

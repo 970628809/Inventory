@@ -28,6 +28,11 @@ STOCK_LOG_COLUMNS = {
     "metadata_json": "TEXT",
 }
 
+USER_COLUMNS = {
+    "is_active": "INTEGER NOT NULL DEFAULT 1",
+    "admin_requested": "INTEGER NOT NULL DEFAULT 0",
+}
+
 
 def ensure_product_columns(cursor):
     existing = column_names("products")
@@ -43,6 +48,13 @@ def ensure_stock_log_columns(cursor):
             cursor.execute(f"ALTER TABLE stock_logs ADD COLUMN {name} {definition}")
 
 
+def ensure_user_columns(cursor):
+    existing = column_names("users")
+    for name, definition in USER_COLUMNS.items():
+        if name not in existing:
+            cursor.execute(f"ALTER TABLE users ADD COLUMN {name} {definition}")
+
+
 def ensure_user(username, password, role):
     if not username or not password:
         return False
@@ -53,8 +65,8 @@ def ensure_user(username, password, role):
             return False
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         conn.execute(
-            "INSERT INTO users (username, password_hash, role, created_at) VALUES (?, ?, ?, ?)",
-            (username, generate_password_hash(password), role, now),
+            "INSERT INTO users (username, password_hash, role, is_active, admin_requested, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (username, generate_password_hash(password), role, 1, 0, now),
         )
         conn.commit()
         return True
@@ -156,10 +168,13 @@ def create_db(reset=False):
             username TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
             role TEXT NOT NULL DEFAULT 'user',
+            is_active INTEGER NOT NULL DEFAULT 1,
+            admin_requested INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL
         )
         """
     )
+    ensure_user_columns(cursor)
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 

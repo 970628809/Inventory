@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+      <h1 class="h3 mb-3">アカウント申請</h1>
+
+      {% if error_message %}
+        <div class="alert alert-danger">{{ error_message }}</div>
+      {% endif %}
+
+      <form method="post" class="card">
+        <div class="card-body">
+          <div class="mb-3">
+            <label class="form-label">ユーザー名</label>
+            <input type="text" name="username" class="form-control" value="{{ form_data.username or '' }}" required autofocus>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">パスワード</label>
+            <input type="password" name="password" class="form-control" minlength="8" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">パスワード確認</label>
+            <input type="password" name="password_confirm" class="form-control" minlength="8" required>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" name="admin_requested" value="1" id="adminRequested" {% if form_data.admin_requested %}checked{% endif %}>
+            <label class="form-check-label" for="adminRequested">管理者権限を希望する</label>
+          </div>
+          <button type="submit" class="btn btn-primary w-100">申請する</button>
+          <div class="text-center mt-3">
+            <a href="{{ url_for('login') }}">ログインに戻る</a>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endblock %}
