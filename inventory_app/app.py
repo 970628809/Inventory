@@ -1,10 +1,12 @@
 import json
 import os
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from io import BytesIO
+from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file
 import sqlite3
 from pathlib import Path
 from datetime import datetime, timedelta
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Alignment, Font, PatternFill
 from markupsafe import Markup, escape
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -108,7 +110,7 @@ def get_db_connection():
 
 def format_staff_stock_display(staff_stock_json):
     """
-    Filter to display staff stock without zero values.
+    Filter to display staff sales without zero values.
     Input: JSON string like '{"A05": 1, "A06": 0, "H12": 2}'
     Output: each staff stock on its own line, or "-" if empty or all zeros
     """
@@ -187,6 +189,18 @@ def parse_staff_stock_form():
     return staff_stock
 
 
+def adjust_staff_sales_json(staff_stock_json, staff_name, delta):
+    if not staff_name or delta == 0:
+        return staff_stock_json or "{}"
+    try:
+        data = json.loads(staff_stock_json or "{}")
+    except Exception:
+        data = {}
+    current = parse_int(data.get(staff_name, 0))
+    data[staff_name] = max(0, current + delta)
+    return json.dumps(data, ensure_ascii=False)
+
+
 def get_inventory_form_options(conn):
     categories = [
         row[0] for row in conn.execute(
@@ -223,9 +237,9 @@ def get_inventory_form_options(conn):
 
 def compute_stock_delta(operation_type, quantity):
     if operation_type == "inbound":
-        return quantity
+        return abs(quantity)
     if operation_type == "outbound":
-        return -quantity
+        return -abs(quantity)
     return quantity
 
 
@@ -417,6 +431,149 @@ def import_excel_file(file_stream):
     }
 
 
+def month_range(target_date=None):
+    target_date = target_date or datetime.now()
+    start = target_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    if start.month == 12:
+        end = start.replace(year=start.year + 1, month=1)
+    else:
+        end = start.replace(month=start.month + 1)
+    return start, end
+
+
+def stock_log_delta(operation_type, quantity):
+    quantity = parse_int(quantity)
+    if operation_type == "inbound":
+        return abs(quantity)
+    if operation_type == "outbound":
+        return -abs(quantity)
+    return quantity
+
+
+def style_report_sheet(sheet):
+    header_fill = PatternFill("solid", fgColor="1F4E78")
+    header_font = Font(color="FFFFFF", bold=True)
+    for cell in sheet[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    sheet.freeze_panes = "A2"
+    for column in sheet.columns:
+        max_length = max(len(str(cell.value or "")) for cell in column)
+        sheet.column_dimensions[column[0].column_letter].width = min(max(max_length + 2, 10), 32)
+
+
+def export_monthly_changes_file(target_date=None):
+    start, end = month_range(target_date)
+    conn = get_db_connection()
+    logs = conn.execute(
+        """
+        SELECT
+            stock_logs.*,
+            products.sku,
+            products.big_category,
+            products.maker_or_product,
+            products.overview,
+            products.current_stock
+        FROM stock_logs
+        JOIN products ON stock_logs.product_id = products.id
+        WHERE stock_logs.created_at >= ? AND stock_logs.created_at < ?
+        ORDER BY stock_logs.created_at ASC, stock_logs.id ASC
+        """,
+        (start.strftime("%Y-%m-%d %H:%M:%S"), end.strftime("%Y-%m-%d %H:%M:%S")),
+    ).fetchall()
+    conn.close()
+
+    workbook = Workbook()
+    detail_sheet = workbook.active
+    detail_sheet.title = "明細"
+    detail_sheet.append([
+        "日時",
+        "操作",
+        "品番",
+        "大分類",
+        "メーカー/商品",
+        "概要",
+        "数量",
+        "増減",
+        "担当者",
+        "メモ",
+        "現在販売可能台数",
+    ])
+
+    summary = {}
+    for log in logs:
+        delta = stock_log_delta(log["operation_type"], log["quantity"])
+        label = OPERATION_LABELS.get(log["operation_type"], log["operation_type"])
+        detail_sheet.append([
+            log["created_at"],
+            label,
+            log["sku"],
+            log["big_category"],
+            log["maker_or_product"],
+            log["overview"],
+            abs(parse_int(log["quantity"])) if log["operation_type"] in ["inbound", "outbound"] else log["quantity"],
+            delta,
+            log["staff_name"],
+            log["note"],
+            log["current_stock"],
+        ])
+
+        key = log["product_id"]
+        if key not in summary:
+            summary[key] = {
+                "sku": log["sku"],
+                "big_category": log["big_category"],
+                "maker_or_product": log["maker_or_product"],
+                "overview": log["overview"],
+                "inbound": 0,
+                "outbound": 0,
+                "adjustment": 0,
+                "net": 0,
+                "current_stock": log["current_stock"],
+            }
+        if log["operation_type"] == "inbound":
+            summary[key]["inbound"] += abs(parse_int(log["quantity"]))
+        elif log["operation_type"] == "outbound":
+            summary[key]["outbound"] += abs(parse_int(log["quantity"]))
+        else:
+            summary[key]["adjustment"] += delta
+        summary[key]["net"] += delta
+
+    summary_sheet = workbook.create_sheet("商品別集計")
+    summary_sheet.append([
+        "品番",
+        "大分類",
+        "メーカー/商品",
+        "概要",
+        "入庫数",
+        "出庫数",
+        "棚卸/修正増減",
+        "純増減",
+        "現在販売可能台数",
+    ])
+    for row in summary.values():
+        summary_sheet.append([
+            row["sku"],
+            row["big_category"],
+            row["maker_or_product"],
+            row["overview"],
+            row["inbound"],
+            row["outbound"],
+            row["adjustment"],
+            row["net"],
+            row["current_stock"],
+        ])
+
+    style_report_sheet(detail_sheet)
+    style_report_sheet(summary_sheet)
+
+    output = BytesIO()
+    workbook.save(output)
+    output.seek(0)
+    return output, start
+
+
 @app.route("/")
 def dashboard():
     conn = get_db_connection()
@@ -581,9 +738,16 @@ def edit_stock_log(log_id):
         if action == "delete_log":
             old_delta = compute_stock_delta(log["operation_type"], log["quantity"])
             new_stock = old_product["current_stock"] - old_delta
+            staff_stock_json = old_product["staff_stock_json"]
+            if log["operation_type"] == "outbound":
+                staff_stock_json = adjust_staff_sales_json(
+                    staff_stock_json,
+                    log["staff_name"],
+                    -abs(log["quantity"]),
+                )
             conn.execute(
-                "UPDATE products SET current_stock = ?, updated_at = ? WHERE id = ?",
-                (new_stock, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), old_product["id"]),
+                "UPDATE products SET current_stock = ?, available_stock = ?, staff_stock_json = ?, updated_at = ? WHERE id = ?",
+                (new_stock, new_stock, staff_stock_json, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), old_product["id"]),
             )
             conn.execute("DELETE FROM stock_logs WHERE id = ?", (log_id,))
             conn.commit()
@@ -610,16 +774,30 @@ def edit_stock_log(log_id):
             new_delta = compute_stock_delta(operation_type, quantity)
             if operation_type == "outbound":
                 quantity = abs(quantity)
-                new_delta = -quantity
+                new_delta = compute_stock_delta(operation_type, quantity)
+            log_quantity = abs(quantity) if operation_type in ["inbound", "outbound"] else quantity
 
             if target_product_id == old_product["id"]:
                 new_stock = old_product["current_stock"] + (new_delta - old_delta)
                 if new_stock < 0:
                     error_message = "在庫数が負になります。数量を調整してください。"
                 else:
+                    staff_stock_json = old_product["staff_stock_json"]
+                    if log["operation_type"] == "outbound":
+                        staff_stock_json = adjust_staff_sales_json(
+                            staff_stock_json,
+                            log["staff_name"],
+                            -abs(log["quantity"]),
+                        )
+                    if operation_type == "outbound":
+                        staff_stock_json = adjust_staff_sales_json(
+                            staff_stock_json,
+                            staff_name,
+                            abs(quantity),
+                        )
                     conn.execute(
-                        "UPDATE products SET current_stock = ?, updated_at = ? WHERE id = ?",
-                        (new_stock, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), old_product["id"]),
+                        "UPDATE products SET current_stock = ?, available_stock = ?, staff_stock_json = ?, updated_at = ? WHERE id = ?",
+                        (new_stock, new_stock, staff_stock_json, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), old_product["id"]),
                     )
             else:
                 target_product = conn.execute(
@@ -634,19 +812,33 @@ def edit_stock_log(log_id):
                     if new_stock_old < 0 or new_stock_target < 0:
                         error_message = "在庫数が負になります。商品と数量を確認してください。"
                     else:
+                        old_staff_stock_json = old_product["staff_stock_json"]
+                        if log["operation_type"] == "outbound":
+                            old_staff_stock_json = adjust_staff_sales_json(
+                                old_staff_stock_json,
+                                log["staff_name"],
+                                -abs(log["quantity"]),
+                            )
+                        target_staff_stock_json = target_product["staff_stock_json"]
+                        if operation_type == "outbound":
+                            target_staff_stock_json = adjust_staff_sales_json(
+                                target_staff_stock_json,
+                                staff_name,
+                                abs(quantity),
+                            )
                         conn.execute(
-                            "UPDATE products SET current_stock = ?, updated_at = ? WHERE id = ?",
-                            (new_stock_old, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), old_product["id"]),
+                            "UPDATE products SET current_stock = ?, available_stock = ?, staff_stock_json = ?, updated_at = ? WHERE id = ?",
+                            (new_stock_old, new_stock_old, old_staff_stock_json, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), old_product["id"]),
                         )
                         conn.execute(
-                            "UPDATE products SET current_stock = ?, updated_at = ? WHERE id = ?",
-                            (new_stock_target, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), target_product_id),
+                            "UPDATE products SET current_stock = ?, available_stock = ?, staff_stock_json = ?, updated_at = ? WHERE id = ?",
+                            (new_stock_target, new_stock_target, target_staff_stock_json, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), target_product_id),
                         )
 
             if error_message is None:
                 conn.execute(
                     "UPDATE stock_logs SET product_id = ?, operation_type = ?, quantity = ?, staff_name = ?, note = ? WHERE id = ?",
-                    (target_product_id, operation_type, new_delta, staff_name, note, log_id),
+                    (target_product_id, operation_type, log_quantity, staff_name, note, log_id),
                 )
                 conn.commit()
                 conn.close()
@@ -875,6 +1067,23 @@ def excel_import():
     return render_template("excel_import.html", result=result)
 
 
+@app.route("/excel_export")
+def excel_export():
+    return render_template("excel_export.html")
+
+
+@app.route("/monthly_changes_export")
+def monthly_changes_export():
+    output, start = export_monthly_changes_file()
+    filename = f"monthly_changes_{start.strftime('%Y_%m')}.xlsx"
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
 @app.route("/stock/operate/<int:product_id>", methods=["GET", "POST"])
 def stock_operate(product_id):
     operation_type = request.args.get("type", "inbound")
@@ -934,13 +1143,16 @@ def stock_operate(product_id):
                         last_out_date = today
 
         if error_message is None and change is not None:
+            staff_stock_json = product["staff_stock_json"]
+            if operation_type == "outbound":
+                staff_stock_json = adjust_staff_sales_json(staff_stock_json, staff_name, abs(quantity))
             conn.execute(
-                "UPDATE products SET current_stock = ?, last_in_date = ?, last_out_date = ?, updated_at = ? WHERE id = ?",
-                (new_stock, last_in_date, last_out_date, today + " 00:00:00", product_id),
+                "UPDATE products SET current_stock = ?, available_stock = ?, staff_stock_json = ?, last_in_date = ?, last_out_date = ?, updated_at = ? WHERE id = ?",
+                (new_stock, new_stock, staff_stock_json, last_in_date, last_out_date, today + " 00:00:00", product_id),
             )
             conn.execute(
                 "INSERT INTO stock_logs (product_id, operation_type, quantity, staff_name, note, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                (product_id, operation_type, quantity, staff_name, note, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+                (product_id, operation_type, abs(quantity) if operation_type in ["inbound", "outbound"] else quantity, staff_name, note, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
             )
             conn.commit()
             conn.close()

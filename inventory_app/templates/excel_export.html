@@ -1,0 +1,6 @@
+{% extends 'base.html' %}
+{% block content %}
+  <h1>Excel出力</h1>
+  <p>今月の入庫・出庫・棚卸修正を、明細と商品別集計のExcelで出力します。</p>
+  <a href="{{ url_for('monthly_changes_export') }}" class="btn btn-primary">本月変更Excelを出力</a>
+{% endblock %}
