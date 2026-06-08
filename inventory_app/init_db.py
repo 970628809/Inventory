@@ -1,4 +1,5 @@
 import sqlite3
+import sys
 from pathlib import Path
 from datetime import datetime
 
@@ -32,7 +33,7 @@ PRODUCTS = []
 LOGS = []
 
 
-def create_db():
+def create_db(reset=False):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
@@ -118,25 +119,30 @@ def create_db():
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    cursor.execute("DELETE FROM stock_logs")
-    cursor.execute("DELETE FROM products")
+    if reset:
+        cursor.execute("DELETE FROM stock_logs")
+        cursor.execute("DELETE FROM products")
 
-    for row_number, (sku, name, category, location, current_stock, reorder_point, last_in_date, last_out_date, notes) in enumerate(PRODUCTS, start=1):
-        cursor.execute(
-            "INSERT INTO products (source_sheet, source_row, big_category, maker_or_product, overview, sku, stock_status, display_flag, available_stock, total_stock, reorder_point, staff_stock_json, notes, imported_at, current_stock, name, category, location, last_in_date, last_out_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            ("sample", row_number, category or "", name, "", sku, "", "", current_stock, current_stock, reorder_point, "{}", notes, now, current_stock, name, category, location, last_in_date, last_out_date, now, now),
-        )
+    if reset or not cursor.execute("SELECT 1 FROM products LIMIT 1").fetchone():
+        for row_number, (sku, name, category, location, current_stock, reorder_point, last_in_date, last_out_date, notes) in enumerate(PRODUCTS, start=1):
+            cursor.execute(
+                "INSERT INTO products (source_sheet, source_row, big_category, maker_or_product, overview, sku, stock_status, display_flag, available_stock, total_stock, reorder_point, staff_stock_json, notes, imported_at, current_stock, name, category, location, last_in_date, last_out_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                ("sample", row_number, category or "", name, "", sku, "", "", current_stock, current_stock, reorder_point, "{}", notes, now, current_stock, name, category, location, last_in_date, last_out_date, now, now),
+            )
 
-    for product_id, operation_type, quantity, staff_name, note, created_at in LOGS:
-        cursor.execute(
-            "INSERT INTO stock_logs (product_id, operation_type, quantity, staff_name, note, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (product_id, operation_type, quantity, staff_name, note, created_at),
-        )
+        for product_id, operation_type, quantity, staff_name, note, created_at in LOGS:
+            cursor.execute(
+                "INSERT INTO stock_logs (product_id, operation_type, quantity, staff_name, note, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (product_id, operation_type, quantity, staff_name, note, created_at),
+            )
 
     conn.commit()
     conn.close()
-    print(f"データベースを初期化しました: {DB_PATH}")
+    if reset:
+        print(f"データベースをリセットしました: {DB_PATH}")
+    else:
+        print(f"データベースを確認しました: {DB_PATH}")
 
 
 if __name__ == "__main__":
-    create_db()
+    create_db(reset="--reset" in sys.argv)

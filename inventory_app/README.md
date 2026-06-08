@@ -27,9 +27,16 @@ source venv/bin/activate
 pip install -r inventory_app/requirements.txt
 ```
 
-## データベース初期化
+## データベース確認
 ```bash
 python inventory_app/init_db.py
+```
+
+このコマンドは既存データを残したままテーブルを確認します。
+データを全部消して作り直す場合だけ、次を使います。
+
+```bash
+python inventory_app/init_db.py --reset
 ```
 
 ## アプリ起動

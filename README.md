@@ -9,9 +9,11 @@ cd /Users/wangyilin/Desktop/Inventory
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-python init_db.py
 python app.py
 ```
+
+日常起動では `python init_db.py` を実行しないでください。データは `inventory_app/inventory.db` に保存されます。
+データベースを作り直す必要がある場合だけ、`python init_db.py --reset` を実行します。
 
 ## 起動後の確認
 - ダッシュボード: http://127.0.0.1:5001/
