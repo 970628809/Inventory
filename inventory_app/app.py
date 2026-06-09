@@ -651,11 +651,9 @@ def import_excel_file(file_stream):
     
     try:
         # Delete old data before importing
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM stock_logs")
-        deleted_logs = cursor.rowcount
-        cursor.execute("DELETE FROM products")
-        deleted_products = cursor.rowcount
+        cursor = conn
+        deleted_logs = cursor.execute("DELETE FROM stock_logs").rowcount
+        deleted_products = cursor.execute("DELETE FROM products").rowcount
         conn.commit()
         
         # Now import new data
@@ -1524,12 +1522,15 @@ def excel_import():
         elif not uploaded_file.filename.lower().endswith(".xlsx"):
             flash(".xlsxファイルをアップロードしてください。", "danger")
         else:
-            result = import_excel_file(uploaded_file)
-            deleted_msg = f"旧データ：{result['deleted_products']}件の商品と{result['deleted_logs']}件のログを削除しました。"
-            if result["errors"] == 0:
-                flash(f"Excel取込が完了しました。{deleted_msg} 新規登録：{result['imported']}件、スキップ：{result['skipped']}件。", "success")
-            else:
-                flash(f"Excel取込が完了しました。{deleted_msg} 新規登録：{result['imported']}件、スキップ：{result['skipped']}件、エラー：{result['errors']}件。", "danger")
+            try:
+                result = import_excel_file(uploaded_file)
+                deleted_msg = f"旧データ：{result['deleted_products']}件の商品と{result['deleted_logs']}件のログを削除しました。"
+                if result["errors"] == 0:
+                    flash(f"Excel取込が完了しました。{deleted_msg} 新規登録：{result['imported']}件、スキップ：{result['skipped']}件。", "success")
+                else:
+                    flash(f"Excel取込が完了しました。{deleted_msg} 新規登録：{result['imported']}件、スキップ：{result['skipped']}件、エラー：{result['errors']}件。", "danger")
+            except Exception as exc:
+                flash(f"Excel取込に失敗しました: {exc}", "danger")
     return render_template("excel_import.html", result=result)
 
 
