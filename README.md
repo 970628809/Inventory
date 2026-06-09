@@ -33,17 +33,15 @@ ADMIN_USERNAME=admin
 ADMIN_PASSWORD=strong-admin-password
 ```
 
-初回だけ DB 初期化を実行します。
-
-```bash
-python inventory_app/init_db.py
-```
-
 アプリ起動例:
 
 ```bash
-gunicorn inventory_app.app:app
+gunicorn app:app
 ```
+
+空の PostgreSQL で初回起動した場合、必要なテーブルは自動作成されます。
+`ADMIN_USERNAME` と `ADMIN_PASSWORD` が設定されていれば、初期管理者も自動作成されます。
+通常のデプロイでは手動で `init_db.py` を実行する必要はありません。
 
 一部の環境で `postgres://...` 形式の URL が渡される場合も、アプリ側で `postgresql://...` として扱います。
 
