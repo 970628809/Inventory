@@ -1,56 +1,78 @@
-# 店舗用在庫管理ツール
+# Inventory App Package
 
-日本の小売店向けに設計された、ローカル実行の在庫管理 Web ツールです。
+This directory contains the Flask application code for the inventory management tool.
 
-## 目的
-- Excel 在庫表の補助として使う
-- ローカルのパソコンで動作させる
-- ログインや権限管理は不要
-- 売上・利益計算や複雑なグラフは含まない
+## Purpose
 
-## ファイル構成
-- `app.py` - Flask アプリ本体
-- `init_db.py` - SQLite データベース初期化スクリプト
-- `inventory.db` - SQLite データベースファイル（初期化後に中身が作成されます）
-- `requirements.txt` - 必要な Python パッケージ
-- `templates/` - HTML テンプレート
-- `static/` - CSS
-- `data/sample_products.csv` - サンプル CSV データ
+- Support inventory work that was previously handled with Excel files
+- Run locally with SQLite during development
+- Run in the cloud with PostgreSQL in production
+- Protect inventory pages with login
+- Separate admin users from regular users
+- Keep the app simple, without complex charts or multi-store features
 
-## インストール
-1. Python 3 を用意します
-2. 仮想環境を作成します
+## Structure
+
+- `app.py` - Main Flask application
+- `db.py` - Database connection helper for SQLite and PostgreSQL
+- `init_db.py` - Database table and user initialization script
+- `requirements.txt` - Python package list for this package
+- `templates/` - HTML templates
+- `static/` - CSS and frontend assets
+- `data/sample_products.csv` - Sample CSV data for local development only
+
+## Install
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-pip install -r inventory_app/requirements.txt
+pip install -r requirements.txt
 ```
 
-## データベース確認
+## Database
+
+For local development, leave `DATABASE_URL` unset and the app will use SQLite:
+
 ```bash
 python inventory_app/init_db.py
 ```
 
-このコマンドは既存データを残したままテーブルを確認します。
-データを全部消して作り直す場合だけ、次を使います。
+To reset local development data only:
 
 ```bash
 python inventory_app/init_db.py --reset
 ```
 
-## アプリ起動
+For cloud deployment, set `DATABASE_URL` to a PostgreSQL connection string.
+
+## Start The App
+
+Local development:
+
 ```bash
-python inventory_app/app.py
+python app.py
 ```
 
-## ブラウザ確認
-- ダッシュボード: http://127.0.0.1:5001/
-- 在庫一覧: http://127.0.0.1:5001/inventory
+Production:
 
-## 5001 ポートが使えない場合
-`APP_PORT=5002 python inventory_app/app.py` のように、`APP_PORT` を指定して別ポートで起動できます。
+```bash
+gunicorn app:app
+```
 
-## メモ
-- 在庫 0、低在庫、30 日以上出庫なしの不動在庫をダッシュボードで確認できます
-- 商品検索は商品名・SKU・カテゴリー・保管場所に対応しています
+## Browser
+
+- Dashboard: `http://127.0.0.1:5001/`
+- Inventory: `http://127.0.0.1:5001/inventory`
+
+If port `5001` is already in use, start with another port:
+
+```bash
+APP_PORT=5002 python app.py
+```
+
+## Notes
+
+- The dashboard shows zero-stock, low-stock, and inactive-stock reminders
+- Inventory search supports product name, SKU, category, and location
+- Admin users can import Excel files, edit inventory, and export data
+- Regular users can view inventory, search, and view reminders

@@ -1,6 +1,6 @@
 # Inventory App
 
-ローカル実行とクラウド実行の両方を想定した Flask 在庫管理ツールです。
+A Flask inventory management tool designed for both local use and cloud deployment.
 
 ## Local SQLite
 
@@ -18,13 +18,13 @@ python inventory_app/init_db.py
 python app.py
 ```
 
-ブラウザで `http://127.0.0.1:5001/` を開き、管理者アカウントでログインします。
+Open `http://127.0.0.1:5001/` in your browser and log in with the admin account.
 
-`DATABASE_URL` を設定しない場合、既定で `inventory_app/inventory.db` の SQLite を使います。
+If `DATABASE_URL` is not set, the app uses the local SQLite database at `inventory_app/inventory.db`.
 
-## Cloud PostgreSQL Preparation
+## Cloud PostgreSQL
 
-クラウドでは次の環境変数を設定します。
+Set these environment variables in your cloud service:
 
 ```bash
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DBNAME
@@ -33,30 +33,31 @@ ADMIN_USERNAME=admin
 ADMIN_PASSWORD=strong-admin-password
 ```
 
-アプリ起動例:
+Production start command:
 
 ```bash
 gunicorn app:app
 ```
 
-空の PostgreSQL で初回起動した場合、必要なテーブルは自動作成されます。
-`ADMIN_USERNAME` と `ADMIN_PASSWORD` が設定されていれば、初期管理者も自動作成されます。
-通常のデプロイでは手動で `init_db.py` を実行する必要はありません。
+On first startup with an empty PostgreSQL database, the app automatically creates the required tables.
+If `ADMIN_USERNAME` and `ADMIN_PASSWORD` are set, it also creates the initial admin user.
+For normal deployment, you do not need to run `init_db.py` manually.
 
-一部の環境で `postgres://...` 形式の URL が渡される場合も、アプリ側で `postgresql://...` として扱います。
+If a cloud provider gives a `postgres://...` URL, the app converts it to `postgresql://...` for SQLAlchemy.
 
 ## Users
 
-`users` テーブルにユーザーを保存します。パスワードは hash 化され、平文では保存されません。
+Users are stored in the `users` table. Passwords are hashed and are never stored as plain text.
 
-初期管理者は次の環境変数を設定して `python inventory_app/init_db.py` を実行すると作成されます。
+To create the initial admin locally:
 
 ```bash
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=strong-admin-password
+python inventory_app/init_db.py
 ```
 
-普通ユーザーをテスト用に作る場合:
+To create an optional regular user for testing:
 
 ```bash
 USER_USERNAME=staff
@@ -66,27 +67,29 @@ python inventory_app/init_db.py
 
 ## Roles
 
-管理者:
-- Excel 取込
-- Excel 出力
-- 在庫修正
-- 新品追加
-- 入庫 / 出庫
-- 棚卸開始、チェック、修正
-- 最近の在庫変動の編集 / 削除
-- リマインダー追加 / 削除
+Admin users can:
 
-普通ユーザー:
-- ダッシュボード閲覧
-- 在庫一覧の閲覧と検索
-- 棚卸一覧の閲覧
-- リマインダー閲覧
+- Import Excel files
+- Export Excel files
+- Edit inventory
+- Add new products
+- Receive and ship stock
+- Start stocktaking, check stock, and apply stock corrections
+- Edit and delete recent inventory activity
+- Add and delete reminders
 
-未ログインユーザーは在庫ページにアクセスできません。
+Regular users can:
+
+- View the dashboard
+- View and search inventory
+- View stocktaking lists
+- View reminders
+
+Users who are not logged in cannot access inventory pages.
 
 ## Files Not To Commit
 
-`.gitignore` で次を除外しています。
+The following files are ignored by `.gitignore`:
 
 - `.env`
 - `inventory_app/inventory.db`
@@ -94,4 +97,4 @@ python inventory_app/init_db.py
 - `uploads/`
 - `exports/`
 
-真实会社データや本番 Excel はリポジトリに入れないでください。
+Do not commit real company data or production Excel files to the repository.
