@@ -134,3 +134,122 @@ td.stock-table-notes small {
   grid-template-columns: repeat(2, minmax(4rem, 1fr));
   gap: 0.25rem;
 }
+
+@media (max-width: 767.98px) {
+  .navbar .container-fluid {
+    align-items: flex-start;
+  }
+
+  .navbar-brand {
+    max-width: calc(100vw - 5rem);
+    white-space: normal;
+  }
+
+  .navbar-collapse {
+    padding-top: 0.75rem;
+  }
+
+  .navbar-nav {
+    gap: 0.25rem;
+  }
+
+  .navbar-nav .nav-link {
+    padding: 0.55rem 0;
+  }
+
+  .navbar .d-flex.align-items-center {
+    align-items: stretch !important;
+    flex-direction: column;
+    margin-top: 0.75rem;
+    width: 100%;
+  }
+
+  .container {
+    max-width: 100%;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  h1 {
+    font-size: 1.45rem;
+  }
+
+  h2 {
+    font-size: 1.2rem;
+  }
+
+  .d-flex.justify-content-between.align-items-center {
+    align-items: flex-start !important;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .d-flex.justify-content-between.align-items-center > .d-flex,
+  .d-flex.justify-content-between.align-items-center > form {
+    width: 100%;
+  }
+
+  .d-flex.justify-content-between.align-items-center > .d-flex .btn,
+  .d-flex.justify-content-between.align-items-center > form .btn {
+    flex: 1 1 0;
+  }
+
+  .btn-group {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+    width: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .btn-group > .btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .table-responsive {
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    margin-left: -0.25rem;
+    margin-right: -0.25rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table-responsive > .table {
+    margin-bottom: 0;
+  }
+
+  .stock-table {
+    min-width: 68rem;
+  }
+
+  .table th,
+  .table td {
+    padding: 0.45rem;
+  }
+
+  .card {
+    min-height: 0;
+  }
+
+  .dashboard-box__content {
+    max-height: 320px;
+  }
+
+  .dashboard-box--expanded .dashboard-box__content {
+    max-height: 70vh;
+  }
+
+  .stocktaking-actions {
+    grid-template-columns: repeat(2, minmax(3.5rem, 1fr));
+  }
+
+  .stocktaking-action-btn {
+    width: auto;
+  }
+
+  .inventory-actions {
+    grid-template-columns: repeat(2, minmax(3.5rem, 1fr));
+  }
+}
