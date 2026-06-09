@@ -120,6 +120,7 @@ def ensure_user_table(conn):
         )
         """.format(pk=sql_type("pk"))
     )
+    conn.commit()
     existing_columns = column_names("users")
     for name, definition in USER_COLUMNS.items():
         if name not in existing_columns:

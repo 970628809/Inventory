@@ -114,6 +114,7 @@ def create_db(reset=False):
     cursor.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_products_source ON products(source_sheet, source_row);"
     )
+    conn.commit()
     ensure_product_columns(cursor)
 
     cursor.execute(
@@ -131,6 +132,7 @@ def create_db(reset=False):
         )
         """
     )
+    conn.commit()
     ensure_stock_log_columns(cursor)
 
     cursor.execute(
@@ -174,6 +176,7 @@ def create_db(reset=False):
         )
         """
     )
+    conn.commit()
     ensure_user_columns(cursor)
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
