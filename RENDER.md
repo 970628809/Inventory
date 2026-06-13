@@ -86,10 +86,11 @@ After Render gives you the service URL, test the app in this order:
 1. Open `/inventory` while logged out and confirm it redirects to `/login`
 2. Log in as the admin user
 3. Log in as the regular user, if one was created
-4. Confirm the regular user can view and search inventory
-5. Confirm the regular user cannot access Excel import or inventory edit pages
-6. Confirm the admin user can upload an Excel file
-7. Confirm the uploaded inventory appears in the inventory list
-8. Confirm zero-stock reminders appear correctly
-9. Confirm low-stock reminders appear correctly
-10. Confirm the site works from a phone or an outside network
+4. Confirm the regular user can view, search, add, edit, receive, and ship inventory
+5. Confirm the regular user can use stocktaking and edit recent inventory activity
+6. Confirm the regular user cannot access Excel import, Excel export, or user management
+7. Confirm the admin user can upload an Excel file
+8. Confirm the uploaded inventory appears in the inventory list
+9. Confirm zero-stock reminders appear correctly
+10. Confirm low-stock reminders appear correctly
+11. Confirm the site works from a phone or an outside network

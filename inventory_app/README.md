@@ -73,6 +73,7 @@ APP_PORT=5002 python app.py
 ## Notes
 
 - The dashboard shows zero-stock, low-stock, and inactive-stock reminders
-- Inventory search supports product name, SKU, category, and location
-- Admin users can import Excel files, edit inventory, and export data
-- Regular users can view inventory, search, and view reminders
+- Inventory search supports product name, SKU, category, supplier, and price fields
+- Admin users can import Excel files, export data, manage users, and manage reminders
+- All logged-in users can add products, edit inventory, receive stock, ship stock, and update stocktaking
+- Regular users can view inventory, search, view reminders, and manage their assigned quantities

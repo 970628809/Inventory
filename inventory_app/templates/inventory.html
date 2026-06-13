@@ -2,7 +2,7 @@
 {% block content %}
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h1 class="mb-0">在庫一覧</h1>
-    {% if is_admin %}
+    {% if can_manage_inventory %}
       <div class="d-flex gap-2">
         {% if edit_mode %}
           <a href="{{ url_for('inventory', q=params.q, sku=params.sku, big_category=params.big_category, supplier=params.supplier) }}" class="btn btn-outline-secondary">修正終了</a>
@@ -63,9 +63,9 @@
           <th class="text-center stock-table-price">税込価格</th>
           <th class="text-center stock-table-available">販売可能台数</th>
           <th class="text-center">総台数</th>
-          <th class="stock-table-staff">{{ '担当者別台数' if is_admin else '担当数量' }}</th>
+          <th class="stock-table-staff">{{ '担当者別台数' if can_manage_inventory else '担当数量' }}</th>
           <th class="stock-table-notes">備考</th>
-          {% if is_admin %}
+          {% if can_manage_inventory %}
             <th class="text-center stock-table-actions-col">操作</th>
           {% endif %}
         </tr>
@@ -96,7 +96,7 @@
             <td class="text-center stock-table-available"><strong>{{ product.available_stock }}</strong></td>
             <td class="text-center">{{ product.total_stock }}</td>
             <td class="stock-table-staff">
-              {% if is_admin %}
+              {% if can_manage_inventory %}
                 <small>{{ product.staff_stock_json | format_staff_stock }}</small>
               {% elif product.staff_stock_json | staff_has_key(current_user.username) %}
                 <button type="button" class="btn btn-sm btn-light staff-quantity-btn" data-product-id="{{ product.id }}" data-quantity="{{ product.staff_stock_json | staff_quantity_for(current_user.username) }}">
@@ -108,7 +108,7 @@
               {% endif %}
             </td>
             <td class="stock-table-notes"><small>{{ product.notes }}</small></td>
-            {% if is_admin %}
+            {% if can_manage_inventory %}
               <td class="stock-table-actions-col">
                 {% if edit_mode %}
                   <a href="{{ url_for('inventory_edit', product_id=product.id) }}" class="btn btn-sm btn-outline-warning w-100" title="修正">修正</a>
@@ -124,7 +124,7 @@
           </tr>
         {% else %}
           <tr>
-            <td colspan="{{ 13 if is_admin else 12 }}" class="text-center text-muted py-4">
+            <td colspan="{{ 13 if can_manage_inventory else 12 }}" class="text-center text-muted py-4">
               <i class="bi bi-inbox"></i> 該当する商品が見つかりません。
             </td>
           </tr>
@@ -132,7 +132,7 @@
       </tbody>
     </table>
   </div>
-  {% if not is_admin %}
+  {% if not can_manage_inventory %}
     <script>
       document.querySelectorAll(".staff-quantity-btn").forEach((button) => {
         button.addEventListener("dblclick", async () => {

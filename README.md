@@ -71,12 +71,16 @@ Admin users can:
 
 - Import Excel files
 - Export Excel files
+- Manage users
+- Add and delete reminders
+
+All logged-in users can:
+
 - Edit inventory
 - Add new products
 - Receive and ship stock
 - Start stocktaking, check stock, and apply stock corrections
 - Edit and delete recent inventory activity
-- Add and delete reminders
 
 Regular users can:
 

@@ -269,9 +269,11 @@ def load_current_user():
 
 @app.context_processor
 def inject_auth_context():
+    current_user = g.get("user")
     return {
-        "current_user": g.get("user"),
-        "is_admin": bool(g.get("user") and g.user["role"] == "admin"),
+        "current_user": current_user,
+        "is_admin": bool(current_user and current_user["role"] == "admin"),
+        "can_manage_inventory": bool(current_user),
     }
 
 
@@ -1089,7 +1091,7 @@ def alert_settings(alert_type):
 
 
 @app.route("/stock/log/edit/<int:log_id>", methods=["GET", "POST"])
-@admin_required
+@login_required
 def edit_stock_log(log_id):
     params = parse_search_args()
     selected_product_id = request.args.get("selected_product_id", type=int)
@@ -1272,7 +1274,7 @@ def edit_stock_log(log_id):
 @login_required
 def inventory():
     params = parse_search_args()
-    edit_mode = g.user["role"] == "admin" and request.args.get("edit") == "1"
+    edit_mode = request.args.get("edit") == "1"
     sql, values = build_product_query(params)
     conn = get_db_connection()
     products = conn.execute(sql, values).fetchall()
@@ -1294,7 +1296,7 @@ def inventory():
 
 
 @app.route("/inventory/new", methods=["GET", "POST"])
-@admin_required
+@login_required
 def inventory_new():
     conn = get_db_connection()
     options = get_inventory_form_options(conn)
@@ -1390,7 +1392,7 @@ def inventory_new():
 
 
 @app.route("/inventory/assign/<int:product_id>", methods=["GET", "POST"])
-@admin_required
+@login_required
 def inventory_assign(product_id):
     conn = get_db_connection()
     product = conn.execute("SELECT * FROM products WHERE id = ?", (product_id,)).fetchone()
@@ -1511,7 +1513,7 @@ def update_staff_quantity(product_id):
 
 
 @app.route("/inventory/edit/<int:product_id>", methods=["GET", "POST"])
-@admin_required
+@login_required
 def inventory_edit(product_id):
     conn = get_db_connection()
     product = conn.execute("SELECT * FROM products WHERE id = ?", (product_id,)).fetchone()
@@ -1675,7 +1677,7 @@ def stocktaking():
 
 
 @app.route("/stocktaking/start", methods=["POST"])
-@admin_required
+@login_required
 def stocktaking_start():
     session["stocktaking_started"] = True
     session["stocktaking_checked_ids"] = []
@@ -1684,7 +1686,7 @@ def stocktaking_start():
 
 
 @app.route("/stocktaking/end", methods=["POST"])
-@admin_required
+@login_required
 def stocktaking_end():
     session["stocktaking_started"] = False
     session["stocktaking_checked_ids"] = []
@@ -1693,7 +1695,7 @@ def stocktaking_end():
 
 
 @app.route("/stocktaking/check/<int:product_id>", methods=["POST"])
-@admin_required
+@login_required
 def stocktaking_check(product_id):
     conn = get_db_connection()
     product = conn.execute("SELECT id FROM products WHERE id = ?", (product_id,)).fetchone()
@@ -1708,7 +1710,7 @@ def stocktaking_check(product_id):
 
 
 @app.route("/stocktaking/edit/<int:product_id>", methods=["GET", "POST"])
-@admin_required
+@login_required
 def stocktaking_edit(product_id):
     conn = get_db_connection()
     product = conn.execute("SELECT * FROM products WHERE id = ?", (product_id,)).fetchone()
@@ -1792,7 +1794,7 @@ def monthly_changes_export():
 
 
 @app.route("/stock/operate/<int:product_id>", methods=["GET", "POST"])
-@admin_required
+@login_required
 def stock_operate(product_id):
     operation_type = request.args.get("type", "inbound")
     if operation_type not in ["inbound", "outbound", "adjustment", "modification"]:

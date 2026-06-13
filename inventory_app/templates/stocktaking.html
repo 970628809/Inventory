@@ -2,7 +2,7 @@
 {% block content %}
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h1 class="mb-0">棚卸</h1>
-    {% if is_admin %}
+    {% if can_manage_inventory %}
       {% if is_started %}
         <div class="d-flex align-items-center gap-2">
           <span class="badge bg-success">棚卸中</span>
@@ -64,7 +64,7 @@
           <th class="text-center">総台数</th>
           <th class="stock-table-staff">担当者別台数</th>
           <th class="stock-table-notes">備考</th>
-          {% if is_admin %}
+          {% if can_manage_inventory %}
             <th class="text-center">Check</th>
           {% endif %}
         </tr>
@@ -84,7 +84,7 @@
             <td class="text-center">{{ product.total_stock }}</td>
             <td class="stock-table-staff"><small>{{ product.staff_stock_json | format_staff_stock }}</small></td>
             <td class="stock-table-notes"><small>{{ product.notes }}</small></td>
-            {% if is_admin %}
+            {% if can_manage_inventory %}
               <td class="text-center">
                 {% if is_started %}
                   <div class="stocktaking-actions">
@@ -104,7 +104,7 @@
           </tr>
         {% else %}
           <tr>
-            <td colspan="{{ 11 if is_admin else 10 }}" class="text-center text-muted py-4">
+            <td colspan="{{ 11 if can_manage_inventory else 10 }}" class="text-center text-muted py-4">
               <i class="bi bi-inbox"></i> 該当する商品が見つかりません。
             </td>
           </tr>
