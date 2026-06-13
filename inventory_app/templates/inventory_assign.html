@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="mb-0">担当者分配</h1>
+    <a href="{{ url_for('inventory') }}" class="btn btn-outline-secondary">在庫一覧に戻る</a>
+  </div>
+
+  {% if error_message %}
+    <div class="alert alert-danger">{{ error_message }}</div>
+  {% endif %}
+
+  <div class="card mb-4">
+    <div class="card-body">
+      <div class="row gy-2">
+        <div class="col-md-4">
+          <small class="text-muted d-block">商品</small>
+          <strong>{% if product.display_flag | is_store_display %}<span class="text-warning">★</span> {% endif %}{{ product.maker_or_product or product.name }}</strong>
+        </div>
+        <div class="col-md-3">
+          <small class="text-muted d-block">品番</small>
+          <code>{{ product.sku }}</code>
+        </div>
+        <div class="col-md-2">
+          <small class="text-muted d-block">販売可能台数</small>
+          <strong>{{ product.available_stock }}</strong>
+        </div>
+        <div class="col-md-2">
+          <small class="text-muted d-block">分配合計</small>
+          <strong>{{ assigned_total }}</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <form method="post" class="row gy-3">
+    <div class="col-12">
+      <label class="form-label">担当者別台数</label>
+      <div class="row gy-2">
+        {% for row in staff_rows %}
+          <div class="col-md-6">
+            <input name="staff_name" class="form-control" list="staffOptions" placeholder="担当者番号" value="{{ row.name }}">
+          </div>
+          <div class="col-md-6">
+            <input type="number" name="staff_quantity" class="form-control" list="quantityOptions" min="0" placeholder="台数" value="{{ row.quantity }}">
+          </div>
+        {% endfor %}
+      </div>
+      <datalist id="staffOptions">
+        {% for staff_name in options.staff_names %}
+          <option value="{{ staff_name }}">
+        {% endfor %}
+      </datalist>
+      <datalist id="quantityOptions">
+        {% for quantity in options.quantities %}
+          <option value="{{ quantity }}">
+        {% endfor %}
+      </datalist>
+    </div>
+
+    <div class="col-12">
+      <button type="submit" class="btn btn-primary">分配を保存</button>
+      <a href="{{ url_for('inventory') }}" class="btn btn-outline-secondary">戻る</a>
+    </div>
+  </form>
+{% endblock %}

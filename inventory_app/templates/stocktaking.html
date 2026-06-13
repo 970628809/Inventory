@@ -57,7 +57,7 @@
           <th class="stock-table-overview">概要</th>
           <th class="stock-table-supplier">仕入れ先</th>
           <th class="stock-table-sku">品番</th>
-          <th class="text-center stock-table-price">卸価格(税抜)</th>
+          <th class="text-center stock-table-price stock-table-wholesale">卸価格(税抜)</th>
           <th class="text-center stock-table-price">税別価格</th>
           <th class="text-center stock-table-price">税込価格</th>
           <th class="text-center">現在在庫</th>
@@ -77,7 +77,7 @@
             <td class="stock-table-overview"><small>{{ product.overview }}</small></td>
             <td class="stock-table-supplier"><small>{{ product.supplier }}</small></td>
             <td class="stock-table-sku"><code>{{ product.sku }}</code></td>
-            <td class="text-center stock-table-price"><small>{{ product.wholesale_price }}</small></td>
+            <td class="text-center stock-table-price stock-table-wholesale"><small>{{ product.wholesale_price }}</small></td>
             <td class="text-center stock-table-price"><small>{{ product.tax_excluded_price }}</small></td>
             <td class="text-center stock-table-price"><small>{{ product.tax_included_price }}</small></td>
             <td class="text-center"><strong>{{ product.current_stock }}</strong></td>

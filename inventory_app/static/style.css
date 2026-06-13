@@ -91,6 +91,16 @@ td.stock-table-overview small {
   width: 5.25rem;
 }
 
+.stock-table-wholesale {
+  max-width: 7rem;
+  width: 7rem;
+}
+
+.stock-table-available {
+  max-width: 4.5rem;
+  width: 4.5rem;
+}
+
 .stock-table-supplier small,
 .stock-table-sku code,
 .stock-table-price small {
@@ -98,8 +108,8 @@ td.stock-table-overview small {
 }
 
 .stock-table-staff {
-  max-width: 11.5rem;
-  width: 11.5rem;
+  max-width: 8.5rem;
+  width: 8.5rem;
 }
 
 td.stock-table-staff small {
@@ -125,13 +135,13 @@ td.stock-table-notes small {
 }
 
 .stock-table-actions-col {
-  min-width: 9rem;
-  width: 9rem;
+  min-width: 11rem;
+  width: 11rem;
 }
 
 .inventory-actions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(4rem, 1fr));
+  grid-template-columns: repeat(3, minmax(3.2rem, 1fr));
   gap: 0.25rem;
 }
 
