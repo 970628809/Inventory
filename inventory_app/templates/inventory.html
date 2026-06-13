@@ -63,7 +63,7 @@
           <th class="text-center stock-table-price">税込価格</th>
           <th class="text-center stock-table-available">販売可能台数</th>
           <th class="text-center">総台数</th>
-          <th class="stock-table-staff">{{ '担当者別台数' if can_manage_inventory else '担当数量' }}</th>
+          <th class="stock-table-staff">{{ '担当者別台数' if is_admin else '担当数量' }}</th>
           <th class="stock-table-notes">備考</th>
           {% if can_manage_inventory %}
             <th class="text-center stock-table-actions-col">操作</th>
@@ -96,7 +96,7 @@
             <td class="text-center stock-table-available"><strong>{{ product.available_stock }}</strong></td>
             <td class="text-center">{{ product.total_stock }}</td>
             <td class="stock-table-staff">
-              {% if can_manage_inventory %}
+              {% if is_admin %}
                 <small>{{ product.staff_stock_json | format_staff_stock }}</small>
               {% elif product.staff_stock_json | staff_has_key(current_user.username) %}
                 <button type="button" class="btn btn-sm btn-light staff-quantity-btn" data-product-id="{{ product.id }}" data-quantity="{{ product.staff_stock_json | staff_quantity_for(current_user.username) }}">
@@ -116,7 +116,6 @@
                   <div class="inventory-actions" role="group">
                     <a href="{{ url_for('stock_operate', product_id=product.id, type='inbound') }}" class="btn btn-sm btn-success" title="入庫">入庫</a>
                     <a href="{{ url_for('stock_operate', product_id=product.id, type='outbound') }}" class="btn btn-sm btn-danger" title="出庫">出庫</a>
-                    <a href="{{ url_for('inventory_assign', product_id=product.id) }}" class="btn btn-sm btn-primary" title="分配担当者">分配</a>
                   </div>
                 {% endif %}
               </td>
@@ -132,7 +131,7 @@
       </tbody>
     </table>
   </div>
-  {% if not can_manage_inventory %}
+  {% if not is_admin %}
     <script>
       document.querySelectorAll(".staff-quantity-btn").forEach((button) => {
         button.addEventListener("dblclick", async () => {

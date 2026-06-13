@@ -145,13 +145,13 @@ td.stock-table-notes small {
 }
 
 .stock-table-actions-col {
-  min-width: 11rem;
-  width: 11rem;
+  min-width: 9rem;
+  width: 9rem;
 }
 
 .inventory-actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(3.2rem, 1fr));
+  grid-template-columns: repeat(2, minmax(4rem, 1fr));
   gap: 0.25rem;
 }
 
