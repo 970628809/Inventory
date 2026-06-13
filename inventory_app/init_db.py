@@ -1,6 +1,7 @@
 import os
 import sys
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from werkzeug.security import generate_password_hash
 
 try:
@@ -33,6 +34,12 @@ USER_COLUMNS = {
     "admin_requested": "INTEGER NOT NULL DEFAULT 0",
 }
 
+APP_TIMEZONE = ZoneInfo(os.getenv("APP_TIMEZONE", "Asia/Tokyo"))
+
+
+def now_jst_string():
+    return datetime.now(APP_TIMEZONE).strftime("%Y-%m-%d %H:%M:%S")
+
 
 def ensure_product_columns(cursor):
     existing = column_names("products")
@@ -63,7 +70,7 @@ def ensure_user(username, password, role):
         existing = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
         if existing:
             return False
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now = now_jst_string()
         conn.execute(
             "INSERT INTO users (username, password_hash, role, is_active, admin_requested, created_at) VALUES (?, ?, ?, ?, ?, ?)",
             (username, generate_password_hash(password), role, 1, 0, now),
@@ -179,7 +186,7 @@ def create_db(reset=False):
     conn.commit()
     ensure_user_columns(cursor)
 
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = now_jst_string()
 
     if reset:
         cursor.execute("DELETE FROM low_stock_alerts")

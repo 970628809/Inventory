@@ -5,6 +5,7 @@ from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file, g
 from pathlib import Path
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from markupsafe import Markup, escape
@@ -17,6 +18,7 @@ except ImportError:
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "inventory.db"
+APP_TIMEZONE = ZoneInfo(os.getenv("APP_TIMEZONE", "Asia/Tokyo"))
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "dev-inventory-secret-key")
@@ -56,6 +58,14 @@ USER_COLUMNS = {
     "admin_requested": "INTEGER NOT NULL DEFAULT 0",
     "created_at": "TEXT NOT NULL",
 }
+
+
+def now_jst():
+    return datetime.now(APP_TIMEZONE).replace(tzinfo=None)
+
+
+def now_jst_string():
+    return now_jst().strftime("%Y-%m-%d %H:%M:%S")
 
 
 def ensure_product_columns(conn):
@@ -136,7 +146,7 @@ def ensure_initial_admin(conn):
     existing = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
     if existing:
         return
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = now_jst_string()
     conn.execute(
         "INSERT INTO users (username, password_hash, role, is_active, admin_requested, created_at) VALUES (?, ?, ?, ?, ?, ?)",
         (username, generate_password_hash(password), "admin", 1, 0, now),
@@ -290,7 +300,7 @@ def register():
                 if existing:
                     error_message = "同じユーザー名がすでに使われています。"
                 else:
-                    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    now = now_jst_string()
                     conn.execute(
                         "INSERT INTO users (username, password_hash, role, is_active, admin_requested, created_at) VALUES (?, ?, ?, ?, ?, ?)",
                         (username, generate_password_hash(password), "user", 1, admin_requested, now),
@@ -471,7 +481,7 @@ def restore_product_snapshot(conn, product_id, snapshot):
         return False
     assignments = ", ".join([f"{field} = ?" for field in fields])
     values = [snapshot[field] for field in fields]
-    values.extend([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), product_id])
+    values.extend([now_jst_string(), product_id])
     conn.execute(
         f"UPDATE products SET {assignments}, updated_at = ? WHERE id = ?",
         values,
@@ -590,7 +600,7 @@ def parse_inventory_row(sheet, sheet_name, row):
             "reorder_point": reorder_point,
             "staff_stock_json": json.dumps(staff_stock, ensure_ascii=False),
             "notes": notes,
-            "imported_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "imported_at": now_jst_string(),
             "current_stock": available_stock,
             "name": name,
             "category": big_category,
@@ -628,7 +638,7 @@ def parse_inventory_row(sheet, sheet_name, row):
             "reorder_point": reorder_point,
             "staff_stock_json": json.dumps({}, ensure_ascii=False),
             "notes": notes,
-            "imported_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "imported_at": now_jst_string(),
             "current_stock": available_stock,
             "name": name,
             "category": big_category,
@@ -691,8 +701,8 @@ def import_excel_file(file_stream):
                             record["name"],
                             record["category"],
                             record["location"],
-                            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            now_jst_string(),
+                            now_jst_string(),
                         ),
                     )
                     imported += 1
@@ -718,7 +728,7 @@ def import_excel_file(file_stream):
 
 
 def month_range(target_date=None):
-    target_date = target_date or datetime.now()
+    target_date = target_date or now_jst()
     start = target_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     if start.month == 12:
         end = start.replace(year=start.year + 1, month=1)
@@ -864,7 +874,7 @@ def export_monthly_changes_file(target_date=None):
 @login_required
 def dashboard():
     conn = get_db_connection()
-    today = datetime.today().date()
+    today = now_jst().date()
     cutoff = today - timedelta(days=30)
 
     zero_stock = conn.execute(
@@ -1056,7 +1066,7 @@ def edit_stock_log(log_id):
                     )
                 conn.execute(
                     "UPDATE products SET current_stock = ?, available_stock = ?, staff_stock_json = ?, updated_at = ? WHERE id = ?",
-                    (new_stock, new_stock, staff_stock_json, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), old_product["id"]),
+                    (new_stock, new_stock, staff_stock_json, now_jst_string(), old_product["id"]),
                 )
             conn.execute("DELETE FROM stock_logs WHERE id = ?", (log_id,))
             conn.commit()
@@ -1109,7 +1119,7 @@ def edit_stock_log(log_id):
                         )
                     conn.execute(
                         "UPDATE products SET current_stock = ?, available_stock = ?, staff_stock_json = ?, updated_at = ? WHERE id = ?",
-                        (new_stock, new_stock, staff_stock_json, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), old_product["id"]),
+                        (new_stock, new_stock, staff_stock_json, now_jst_string(), old_product["id"]),
                     )
             else:
                 target_product = conn.execute(
@@ -1140,11 +1150,11 @@ def edit_stock_log(log_id):
                             )
                         conn.execute(
                             "UPDATE products SET current_stock = ?, available_stock = ?, staff_stock_json = ?, updated_at = ? WHERE id = ?",
-                            (new_stock_old, new_stock_old, old_staff_stock_json, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), old_product["id"]),
+                            (new_stock_old, new_stock_old, old_staff_stock_json, now_jst_string(), old_product["id"]),
                         )
                         conn.execute(
                             "UPDATE products SET current_stock = ?, available_stock = ?, staff_stock_json = ?, updated_at = ? WHERE id = ?",
-                            (new_stock_target, new_stock_target, target_staff_stock_json, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), target_product_id),
+                            (new_stock_target, new_stock_target, target_staff_stock_json, now_jst_string(), target_product_id),
                         )
 
             if error_message is None:
@@ -1235,7 +1245,7 @@ def inventory_new():
                 "SELECT COALESCE(MAX(source_row), 0) + 1 FROM products WHERE source_sheet = ?",
                 (source_sheet,),
             ).fetchone()[0]
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            now = now_jst_string()
             product_name = maker_or_product or sku or overview or supplier or "不明"
             cursor = conn.execute(
                 "INSERT INTO products (source_sheet, source_row, big_category, maker_or_product, overview, supplier, amount, sku, stock_status, display_flag, available_stock, total_stock, reorder_point, staff_stock_json, notes, imported_at, current_stock, name, category, location, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -1329,7 +1339,7 @@ def inventory_edit(product_id):
                 error_message = "同じ品番の商品がすでにあります。"
 
         if error_message is None:
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            now = now_jst_string()
             stock_change = available_stock - product["current_stock"]
             product_name = maker_or_product or sku or overview or supplier or "不明"
             before_snapshot = product_snapshot(product)
@@ -1489,7 +1499,7 @@ def stocktaking_edit(product_id):
             error_message = "理由を入力してください。"
         else:
             change = new_stock - product["current_stock"]
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            now = now_jst_string()
             conn.execute(
                 "UPDATE products SET current_stock = ?, available_stock = ?, updated_at = ? WHERE id = ?",
                 (new_stock, new_stock, now, product_id),
@@ -1573,7 +1583,7 @@ def stock_operate(product_id):
     if request.method == "POST":
         staff_name = request.form.get("staff_name", "").strip()
         note = request.form.get("note", "").strip()
-        today = datetime.today().date().isoformat()
+        today = now_jst().date().isoformat()
         current_stock = product["current_stock"]
         quantity = None
         change = None
@@ -1622,7 +1632,7 @@ def stock_operate(product_id):
             )
             conn.execute(
                 "INSERT INTO stock_logs (product_id, operation_type, quantity, staff_name, note, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                (product_id, operation_type, abs(quantity) if operation_type in ["inbound", "outbound"] else quantity, staff_name, note, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+                (product_id, operation_type, abs(quantity) if operation_type in ["inbound", "outbound"] else quantity, staff_name, note, now_jst_string()),
             )
             conn.commit()
             conn.close()
