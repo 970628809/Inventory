@@ -11,24 +11,4 @@
     <button type="submit" class="btn btn-primary">取込を実行</button>
   </form>
 
-  {% if result %}
-    <div class="card mb-4">
-      <div class="card-body">
-        <h5 class="card-title">取込結果</h5>
-        <p>登録件数: {{ result.imported }}</p>
-        <p>スキップ件数: {{ result.skipped }}</p>
-        <p>エラー件数: {{ result.errors }}</p>
-        {% if result.error_details %}
-          <div class="mt-3">
-            <h6>エラー詳細</h6>
-            <ul>
-              {% for error in result.error_details %}
-                <li>{{ error }}</li>
-              {% endfor %}
-            </ul>
-          </div>
-        {% endif %}
-      </div>
-    </div>
-  {% endif %}
 {% endblock %}

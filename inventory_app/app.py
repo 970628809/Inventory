@@ -632,10 +632,14 @@ def parse_staff_stock(sheet, row):
 
 NORMAL_SHEETS = {
     "エアコン在庫": "エアコン",
+    "エアコン": "エアコン",
     "給湯器在庫": "給湯器",
+    "給湯器": "給湯器",
     "トイレ在庫": "トイレ",
+    "トイレ": "トイレ",
     "その他設備在庫": None,
-    "その他家電在庫": None,
+    "その他設備": None,
+    "その他の設備": None,
 }
 
 
@@ -690,47 +694,6 @@ def parse_inventory_row(sheet, sheet_name, row):
             "category": big_category,
             "location": "",
         }
-    if sheet_name == "魚倉庫在庫":
-        reorder_point = parse_int(get_cell(sheet, row, 2))
-        stock_status = str(get_cell(sheet, row, 3)).strip()
-        available_stock = parse_int(get_cell(sheet, row, 4))
-        maker_or_product = str(get_cell(sheet, row, 8)).strip()
-        overview = str(get_cell(sheet, row, 7)).strip()
-        sku = str(get_cell(sheet, row, 9)).strip()
-        supplier = str(get_cell(sheet, row, 10)).strip()
-        tax_included_price = str(get_cell(sheet, row, 11)).strip()
-        notes = str(get_cell(sheet, row, 20)).strip()
-        big_category = str(get_cell(sheet, row, 6)).strip()
-
-        if not sku and not overview:
-            return None
-
-        name = maker_or_product or sku or overview or "不明"
-        return {
-            "source_sheet": sheet_name,
-            "source_row": row,
-            "big_category": big_category,
-            "maker_or_product": maker_or_product,
-            "overview": overview,
-            "supplier": supplier,
-            "amount": "",
-            "wholesale_price": "",
-            "tax_excluded_price": "",
-            "tax_included_price": tax_included_price,
-            "sku": sku,
-            "stock_status": stock_status,
-            "display_flag": "",
-            "available_stock": available_stock,
-            "total_stock": 0,
-            "reorder_point": reorder_point,
-            "staff_stock_json": json.dumps({}, ensure_ascii=False),
-            "notes": notes,
-            "imported_at": now_jst_string(),
-            "current_stock": available_stock,
-            "name": name,
-            "category": big_category,
-            "location": "",
-        }
     return None
 
 
@@ -755,7 +718,7 @@ def import_excel_file(file_stream):
         
         # Now import new data
         for sheet_name in sheet_names:
-            if sheet_name not in list(NORMAL_SHEETS.keys()) + ["魚倉庫在庫"]:
+            if sheet_name not in NORMAL_SHEETS:
                 continue
             sheet = workbook[sheet_name]
             for row in range(4, sheet.max_row + 1):
@@ -1754,7 +1717,6 @@ def stocktaking_edit(product_id):
 @app.route("/excel_import", methods=["GET", "POST"])
 @admin_required
 def excel_import():
-    result = None
     if request.method == "POST":
         uploaded_file = request.files.get("excel_file")
         if not uploaded_file or uploaded_file.filename == "":
@@ -1763,15 +1725,11 @@ def excel_import():
             flash(".xlsxファイルをアップロードしてください。", "danger")
         else:
             try:
-                result = import_excel_file(uploaded_file)
-                deleted_msg = f"旧データ：{result['deleted_products']}件の商品と{result['deleted_logs']}件のログを削除しました。"
-                if result["errors"] == 0:
-                    flash(f"Excel取込が完了しました。{deleted_msg} 新規登録：{result['imported']}件、スキップ：{result['skipped']}件。", "success")
-                else:
-                    flash(f"Excel取込が完了しました。{deleted_msg} 新規登録：{result['imported']}件、スキップ：{result['skipped']}件、エラー：{result['errors']}件。", "danger")
+                import_excel_file(uploaded_file)
+                flash("Excelを読み込みました。", "success")
             except Exception as exc:
                 flash(f"Excel取込に失敗しました: {exc}", "danger")
-    return render_template("excel_import.html", result=result)
+    return render_template("excel_import.html")
 
 
 @app.route("/excel_export")
