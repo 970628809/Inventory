@@ -374,26 +374,46 @@ def parse_search_args():
     }
 
 
+def normalize_search_value(value):
+    return str(value or "").lower().replace("-", "").replace("－", "").replace("ー", "")
+
+
+def searchable_column(column):
+    return f"LOWER(REPLACE(REPLACE(REPLACE(COALESCE({column}, ''), '-', ''), '－', ''), 'ー', ''))"
+
+
 def build_product_query(params):
     sql = "SELECT * FROM products WHERE 1=1"
     values = []
 
     if params["q"]:
-        sql += " AND (name LIKE ? OR sku LIKE ? OR big_category LIKE ? OR maker_or_product LIKE ? OR overview LIKE ? OR notes LIKE ? OR source_sheet LIKE ? OR category LIKE ? OR supplier LIKE ? OR staff_stock_json LIKE ? )"
-        term = f"%{params['q']}%"
+        search_columns = [
+            "name",
+            "sku",
+            "big_category",
+            "maker_or_product",
+            "overview",
+            "notes",
+            "source_sheet",
+            "category",
+            "supplier",
+            "staff_stock_json",
+        ]
+        sql += " AND (" + " OR ".join([f"{searchable_column(column)} LIKE ?" for column in search_columns]) + ")"
+        term = f"%{normalize_search_value(params['q'])}%"
         values.extend([term] * 10)
 
     if params["sku"]:
-        sql += " AND sku LIKE ?"
-        values.append(f"%{params['sku']}%")
+        sql += f" AND {searchable_column('sku')} LIKE ?"
+        values.append(f"%{normalize_search_value(params['sku'])}%")
 
     if params["big_category"]:
         sql += " AND big_category = ?"
         values.append(params["big_category"])
 
     if params["supplier"]:
-        sql += " AND supplier LIKE ?"
-        values.append(f"%{params['supplier']}%")
+        sql += f" AND {searchable_column('supplier')} LIKE ?"
+        values.append(f"%{normalize_search_value(params['supplier'])}%")
 
     sql += " ORDER BY name ASC"
     return sql, values
