@@ -396,7 +396,7 @@ def users():
                 ("user", 0, user_id),
             )
             conn.commit()
-            flash("普通ユーザーに変更しました。", "success")
+            flash("一般ユーザーに変更しました。", "success")
         elif action == "activate":
             conn.execute("UPDATE users SET is_active = ? WHERE id = ?", (1, user_id))
             conn.commit()
