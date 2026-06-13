@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+      <h1 class="h3 mb-3">アカウント設定</h1>
+
+      {% if error_message %}
+        <div class="alert alert-danger">{{ error_message }}</div>
+      {% endif %}
+
+      <form method="post" class="card" novalidate>
+        <div class="card-body">
+          <div class="mb-3">
+            <label class="form-label">ユーザー名</label>
+            <input type="text" name="username" class="form-control" value="{{ form_data.username or '' }}" required autofocus>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">現在のパスワード</label>
+            <input type="password" name="current_password" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">新しいパスワード</label>
+            <input type="password" name="new_password" class="form-control" minlength="8">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">新しいパスワード確認</label>
+            <input type="password" name="new_password_confirm" class="form-control" minlength="8">
+          </div>
+          <button type="submit" class="btn btn-primary w-100">更新する</button>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endblock %}

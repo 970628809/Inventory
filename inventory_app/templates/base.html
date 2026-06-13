@@ -29,6 +29,7 @@
           {% if current_user %}
             <div class="d-flex align-items-center gap-2 text-white">
               <small>{{ current_user.username }} / {{ '管理者' if current_user.role == 'admin' else '一般' }}</small>
+              <a class="btn btn-sm btn-outline-light" href="{{ url_for('account') }}">アカウント</a>
               <a class="btn btn-sm btn-outline-light" href="{{ url_for('logout') }}">ログアウト</a>
             </div>
           {% endif %}

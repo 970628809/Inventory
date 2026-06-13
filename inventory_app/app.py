@@ -373,6 +373,53 @@ def logout():
     return redirect(url_for("login"))
 
 
+@app.route("/account", methods=["GET", "POST"])
+@login_required
+def account():
+    error_message = None
+    form_data = {"username": g.user["username"]}
+
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        current_password = request.form.get("current_password", "")
+        new_password = request.form.get("new_password", "")
+        new_password_confirm = request.form.get("new_password_confirm", "")
+        form_data = {"username": username}
+
+        conn = get_db_connection()
+        try:
+            user = conn.execute("SELECT * FROM users WHERE id = ?", (g.user["id"],)).fetchone()
+            if not username:
+                error_message = "ユーザー名を入力してください。"
+            elif not current_password or not check_password_hash(user["password_hash"], current_password):
+                error_message = "現在のパスワードが正しくありません。"
+            elif new_password and len(new_password) < 8:
+                error_message = "新しいパスワードは8文字以上で入力してください。"
+            elif new_password != new_password_confirm:
+                error_message = "確認用パスワードが一致しません。"
+            else:
+                existing = conn.execute(
+                    "SELECT id FROM users WHERE username = ? AND id != ?",
+                    (username, g.user["id"]),
+                ).fetchone()
+                if existing:
+                    error_message = "同じユーザー名がすでに使われています。"
+                else:
+                    password_hash = generate_password_hash(new_password) if new_password else user["password_hash"]
+                    conn.execute(
+                        "UPDATE users SET username = ?, password_hash = ? WHERE id = ?",
+                        (username, password_hash, g.user["id"]),
+                    )
+                    rename_staff_stock_key(conn, user["username"], username)
+                    conn.commit()
+                    flash("アカウント情報を更新しました。", "success")
+                    return redirect(url_for("account"))
+        finally:
+            conn.close()
+
+    return render_template("account.html", error_message=error_message, form_data=form_data)
+
+
 @app.route("/users", methods=["GET", "POST"])
 @admin_required
 def users():
@@ -525,6 +572,28 @@ def adjust_staff_sales_json(staff_stock_json, staff_name, delta):
     current = parse_int(data.get(staff_name, 0))
     data[staff_name] = max(0, current + delta)
     return json.dumps(data, ensure_ascii=False)
+
+
+def rename_staff_stock_key(conn, old_name, new_name):
+    if not old_name or not new_name or old_name == new_name:
+        return
+    rows = conn.execute(
+        "SELECT id, staff_stock_json FROM products WHERE staff_stock_json IS NOT NULL AND staff_stock_json != ''"
+    ).fetchall()
+    for row in rows:
+        try:
+            data = json.loads(row["staff_stock_json"] or "{}")
+        except Exception:
+            continue
+        if old_name not in data:
+            continue
+        old_quantity = parse_int(data.pop(old_name))
+        if old_quantity != 0:
+            data[new_name] = parse_int(data.get(new_name, 0)) + old_quantity
+        conn.execute(
+            "UPDATE products SET staff_stock_json = ? WHERE id = ?",
+            (json.dumps(data, ensure_ascii=False), row["id"]),
+        )
 
 
 PRODUCT_SNAPSHOT_FIELDS = [
