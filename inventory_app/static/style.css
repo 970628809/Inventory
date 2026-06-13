@@ -82,8 +82,8 @@ td.stock-table-overview small {
 }
 
 .stock-table-sku {
-  max-width: 7.5rem;
-  width: 7.5rem;
+  max-width: 9rem;
+  width: 9rem;
 }
 
 .stock-table-price {
@@ -97,8 +97,8 @@ td.stock-table-overview small {
 }
 
 .stock-table-available {
-  max-width: 4.5rem;
-  width: 4.5rem;
+  max-width: 6.5rem;
+  width: 6.5rem;
 }
 
 .stock-table-supplier small,
@@ -108,8 +108,8 @@ td.stock-table-overview small {
 }
 
 .stock-table-staff {
-  max-width: 8.5rem;
-  width: 8.5rem;
+  max-width: 7rem;
+  width: 7rem;
 }
 
 td.stock-table-staff small {

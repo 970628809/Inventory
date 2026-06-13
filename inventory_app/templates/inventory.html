@@ -105,7 +105,7 @@
                   <div class="inventory-actions" role="group">
                     <a href="{{ url_for('stock_operate', product_id=product.id, type='inbound') }}" class="btn btn-sm btn-success" title="入庫">入庫</a>
                     <a href="{{ url_for('stock_operate', product_id=product.id, type='outbound') }}" class="btn btn-sm btn-danger" title="出庫">出庫</a>
-                    <a href="{{ url_for('inventory_assign', product_id=product.id) }}" class="btn btn-sm btn-outline-primary" title="分配担当者">分配</a>
+                    <a href="{{ url_for('inventory_assign', product_id=product.id) }}" class="btn btn-sm btn-primary" title="分配担当者">分配</a>
                   </div>
                 {% endif %}
               </td>
