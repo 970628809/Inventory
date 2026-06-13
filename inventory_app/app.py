@@ -1415,6 +1415,30 @@ def inventory_assign(product_id):
     )
 
 
+@app.route("/my_staff_products")
+@login_required
+def my_staff_products():
+    staff_name = g.user["username"]
+    conn = get_db_connection()
+    products = conn.execute("SELECT * FROM products ORDER BY name ASC").fetchall()
+    conn.close()
+
+    rows = []
+    total = 0
+    for product in products:
+        quantity = staff_quantity_for(product["staff_stock_json"], staff_name)
+        if quantity > 0:
+            rows.append({"product": product, "quantity": quantity})
+            total += quantity
+
+    return render_template(
+        "my_staff_products.html",
+        rows=rows,
+        staff_name=staff_name,
+        total=total,
+    )
+
+
 @app.route("/inventory/staff_quantity/<int:product_id>", methods=["POST"])
 @login_required
 def update_staff_quantity(product_id):

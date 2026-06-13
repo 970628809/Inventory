@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="mb-0">担当商品</h1>
+      <small class="text-muted">{{ staff_name }} / 合計 {{ total }} 台</small>
+    </div>
+    <a href="{{ url_for('inventory') }}" class="btn btn-outline-secondary">在庫一覧</a>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-bordered table-hover align-middle table-sm stock-table">
+      <thead class="table-dark sticky-top">
+        <tr>
+          <th class="text-center">大分類</th>
+          <th>メーカー/商品</th>
+          <th class="stock-table-overview">概要</th>
+          <th class="stock-table-sku">品番</th>
+          <th class="text-center stock-table-available">販売可能台数</th>
+          <th class="text-center stock-table-staff">担当数量</th>
+          <th class="stock-table-notes">備考</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          {% set product = row.product %}
+          <tr>
+            <td class="text-center"><span class="badge bg-primary">{{ product.big_category }}</span></td>
+            <td><strong>{% if product.display_flag | is_store_display %}<span class="text-warning">★</span> {% endif %}{{ product.maker_or_product }}</strong></td>
+            <td class="stock-table-overview"><small>{{ product.overview }}</small></td>
+            <td class="stock-table-sku"><code>{{ product.sku }}</code></td>
+            <td class="text-center stock-table-available"><strong>{{ product.available_stock }}</strong></td>
+            <td class="text-center stock-table-staff">
+              <button type="button" class="btn btn-sm btn-light staff-quantity-btn" data-product-id="{{ product.id }}" data-quantity="{{ row.quantity }}">
+                {{ row.quantity }}
+              </button>
+            </td>
+            <td class="stock-table-notes"><small>{{ product.notes }}</small></td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="7" class="text-center text-muted py-4">担当商品がありません。</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    document.querySelectorAll(".staff-quantity-btn").forEach((button) => {
+      button.addEventListener("dblclick", async () => {
+        const current = button.dataset.quantity || "0";
+        const next = window.prompt("担当数量を入力してください", current);
+        if (next === null) return;
+        const quantity = Number.parseInt(next, 10);
+        if (!Number.isInteger(quantity) || quantity < 0) {
+          window.alert("0以上の数字を入力してください。");
+          return;
+        }
+
+        const body = new URLSearchParams({ quantity: String(quantity) });
+        const response = await fetch(`/inventory/staff_quantity/${button.dataset.productId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body,
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) {
+          window.alert(result.message || "更新できませんでした。");
+          return;
+        }
+        button.dataset.quantity = String(result.quantity);
+        button.textContent = String(result.quantity);
+        const row = button.closest("tr");
+        const stockCell = row ? row.querySelector(".stock-table-available strong") : null;
+        if (stockCell) stockCell.textContent = String(result.current_stock);
+      });
+    });
+  </script>
+{% endblock %}
