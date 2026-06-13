@@ -485,6 +485,23 @@ def adjust_staff_sales_json(staff_stock_json, staff_name, delta):
     return json.dumps(data, ensure_ascii=False)
 
 
+def parse_staff_stock_json(staff_stock_json):
+    try:
+        data = json.loads(staff_stock_json or "{}")
+    except Exception:
+        return {}
+    return {str(name).strip(): parse_int(quantity) for name, quantity in data.items() if str(name).strip()}
+
+
+def encode_staff_stock_json(data):
+    cleaned = {
+        name: parse_int(quantity)
+        for name, quantity in data.items()
+        if name and (parse_int(quantity) != 0 or name in data)
+    }
+    return json.dumps(cleaned, ensure_ascii=False)
+
+
 PRODUCT_SNAPSHOT_FIELDS = [
     "source_sheet",
     "big_category",
@@ -1225,6 +1242,88 @@ def edit_stock_log(log_id):
         params=params,
         selected_product=selected_product,
         selected_product_id=selected_product_id,
+    )
+
+
+@app.route("/staff_stock")
+@login_required
+def staff_stock():
+    conn = get_db_connection()
+    products = conn.execute(
+        "SELECT id, staff_stock_json FROM products WHERE staff_stock_json IS NOT NULL AND staff_stock_json != ''"
+    ).fetchall()
+    conn.close()
+
+    summaries = {}
+    for product in products:
+        for staff_name, quantity in parse_staff_stock_json(product["staff_stock_json"]).items():
+            summary = summaries.setdefault(staff_name, {"name": staff_name, "total": 0, "product_count": 0})
+            if quantity > 0:
+                summary["total"] += quantity
+                summary["product_count"] += 1
+
+    staff_rows = sorted(summaries.values(), key=lambda row: row["name"])
+    return render_template("staff_stock.html", staff_rows=staff_rows)
+
+
+@app.route("/staff_stock/<staff_name>", methods=["GET", "POST"])
+@login_required
+def staff_stock_detail(staff_name):
+    params = parse_search_args()
+    conn = get_db_connection()
+
+    if request.method == "POST":
+        if g.user["role"] != "admin":
+            conn.close()
+            flash("管理者権限が必要です。", "danger")
+            return redirect(url_for("staff_stock_detail", staff_name=staff_name, **params))
+
+        product_ids = request.form.getlist("product_id")
+        for product_id in product_ids:
+            quantity = parse_int(request.form.get(f"quantity_{product_id}"))
+            if quantity < 0:
+                conn.close()
+                flash("台数は0以上で入力してください。", "danger")
+                return redirect(url_for("staff_stock_detail", staff_name=staff_name, **params))
+
+            product = conn.execute(
+                "SELECT staff_stock_json FROM products WHERE id = ?",
+                (product_id,),
+            ).fetchone()
+            if not product:
+                continue
+            staff_stock = parse_staff_stock_json(product["staff_stock_json"])
+            if quantity > 0 or staff_name in staff_stock:
+                staff_stock[staff_name] = quantity
+            conn.execute(
+                "UPDATE products SET staff_stock_json = ?, updated_at = ? WHERE id = ?",
+                (encode_staff_stock_json(staff_stock), now_jst_string(), product_id),
+            )
+
+        conn.commit()
+        conn.close()
+        flash("担当者別台数を更新しました。", "success")
+        return redirect(url_for("staff_stock_detail", staff_name=staff_name, **params))
+
+    sql, values = build_product_query(params)
+    products = conn.execute(sql, values).fetchall()
+    conn.close()
+
+    rows = []
+    total = 0
+    for product in products:
+        quantity = parse_staff_stock_json(product["staff_stock_json"]).get(staff_name, 0)
+        if g.user["role"] == "admin" or quantity > 0:
+            rows.append({"product": product, "quantity": quantity})
+        if quantity > 0:
+            total += quantity
+
+    return render_template(
+        "staff_stock_detail.html",
+        staff_name=staff_name,
+        rows=rows,
+        total=total,
+        params=params,
     )
 
 
