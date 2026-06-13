@@ -38,7 +38,7 @@
         <div class="card-body">
           <p class="mb-2"><strong><code>{{ selected_product.sku }}</code></strong> {{ selected_product.name }}</p>
           <p class="mb-1">現在在庫: <strong>{{ selected_product.current_stock }}</strong></p>
-          <p class="mb-0">保管場所: {{ selected_product.location or '-' }}</p>
+          <p class="mb-0">仕入れ先: {{ selected_product.supplier or '-' }}</p>
         </div>
       </div>
 
@@ -95,8 +95,8 @@
               <input type="text" name="q" value="{{ params.q }}" class="form-control" placeholder="検索...">
             </div>
             <div class="col-6 col-md-3">
-              <label class="form-label">保管場所</label>
-              <input type="text" name="location" value="{{ params.location }}" class="form-control" placeholder="棚・倉庫">
+              <label class="form-label">仕入れ先</label>
+              <input type="text" name="supplier" value="{{ params.supplier }}" class="form-control" placeholder="仕入れ先">
             </div>
             <div class="col-6 col-md-3">
               <label class="form-label">品番</label>
@@ -136,7 +136,7 @@
                       <td>{{ product.name }}</td>
                       <td class="text-center"><strong>{{ product.current_stock }}</strong></td>
                       <td class="text-center">
-                        <a href="{{ url_for('edit_stock_log', log_id=log.id, q=params.q, sku=params.sku, big_category=params.big_category, location=params.location, selected_product_id=product.id) }}" class="btn btn-sm btn-outline-primary">選択</a>
+                        <a href="{{ url_for('edit_stock_log', log_id=log.id, q=params.q, sku=params.sku, big_category=params.big_category, supplier=params.supplier, selected_product_id=product.id) }}" class="btn btn-sm btn-outline-primary">選択</a>
                       </td>
                     </tr>
                   {% endfor %}

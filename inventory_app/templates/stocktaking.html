@@ -6,12 +6,12 @@
       {% if is_started %}
         <div class="d-flex align-items-center gap-2">
           <span class="badge bg-success">棚卸中</span>
-          <form method="post" action="{{ url_for('stocktaking_end', q=params.q, sku=params.sku, big_category=params.big_category, location=params.location) }}">
+          <form method="post" action="{{ url_for('stocktaking_end', q=params.q, sku=params.sku, big_category=params.big_category, supplier=params.supplier) }}">
             <button type="submit" class="btn btn-outline-secondary">棚卸終了</button>
           </form>
         </div>
       {% else %}
-        <form method="post" action="{{ url_for('stocktaking_start', q=params.q, sku=params.sku, big_category=params.big_category, location=params.location) }}">
+        <form method="post" action="{{ url_for('stocktaking_start', q=params.q, sku=params.sku, big_category=params.big_category, supplier=params.supplier) }}">
           <button type="submit" class="btn btn-primary">棚卸開始</button>
         </form>
       {% endif %}
@@ -22,7 +22,7 @@
     <div class="btn-group" role="group">
       <a href="{{ url_for('stocktaking') }}" class="btn btn-sm {% if not params.big_category %}btn-primary{% else %}btn-outline-primary{% endif %}">すべて</a>
       {% for category in big_categories %}
-        <a href="{{ url_for('stocktaking', big_category=category, q=params.q, sku=params.sku, location=params.location) }}" class="btn btn-sm {% if params.big_category == category %}btn-primary{% else %}btn-outline-primary{% endif %}">{{ category }}</a>
+        <a href="{{ url_for('stocktaking', big_category=category, q=params.q, sku=params.sku, supplier=params.supplier) }}" class="btn btn-sm {% if params.big_category == category %}btn-primary{% else %}btn-outline-primary{% endif %}">{{ category }}</a>
       {% endfor %}
     </div>
   </div>
@@ -33,8 +33,8 @@
       <input type="text" name="q" value="{{ params.q }}" class="form-control" placeholder="検索...">
     </div>
     <div class="col-md-2">
-      <label class="form-label">保管場所</label>
-      <input type="text" name="location" value="{{ params.location }}" class="form-control" placeholder="棚・倉庫">
+      <label class="form-label">仕入れ先</label>
+      <input type="text" name="supplier" value="{{ params.supplier }}" class="form-control" placeholder="仕入れ先">
     </div>
     <div class="col-md-2">
       <label class="form-label">品番</label>
@@ -84,7 +84,7 @@
               <td class="text-center">
                 {% if is_started %}
                   <div class="stocktaking-actions">
-                    <form method="post" action="{{ url_for('stocktaking_check', product_id=product.id, q=params.q, sku=params.sku, big_category=params.big_category, location=params.location) }}">
+                    <form method="post" action="{{ url_for('stocktaking_check', product_id=product.id, q=params.q, sku=params.sku, big_category=params.big_category, supplier=params.supplier) }}">
                       <button type="submit" class="btn btn-sm {% if product.id in checked_product_ids %}btn-success{% else %}btn-outline-success{% endif %} stocktaking-action-btn" title="確認">✓</button>
                     </form>
                     <a href="{{ url_for('stocktaking_edit', product_id=product.id) }}" class="btn btn-sm btn-outline-warning stocktaking-action-btn" title="修正">修正</a>

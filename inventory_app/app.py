@@ -370,7 +370,7 @@ def parse_search_args():
         "q": request.args.get("q", "", type=str).strip(),
         "sku": request.args.get("sku", "", type=str).strip(),
         "big_category": request.args.get("big_category", "", type=str).strip(),
-        "location": request.args.get("location", "", type=str).strip(),
+        "supplier": request.args.get("supplier", request.args.get("location", ""), type=str).strip(),
     }
 
 
@@ -379,7 +379,7 @@ def build_product_query(params):
     values = []
 
     if params["q"]:
-        sql += " AND (name LIKE ? OR sku LIKE ? OR big_category LIKE ? OR maker_or_product LIKE ? OR overview LIKE ? OR notes LIKE ? OR source_sheet LIKE ? OR category LIKE ? OR location LIKE ? OR staff_stock_json LIKE ? )"
+        sql += " AND (name LIKE ? OR sku LIKE ? OR big_category LIKE ? OR maker_or_product LIKE ? OR overview LIKE ? OR notes LIKE ? OR source_sheet LIKE ? OR category LIKE ? OR supplier LIKE ? OR staff_stock_json LIKE ? )"
         term = f"%{params['q']}%"
         values.extend([term] * 10)
 
@@ -391,9 +391,9 @@ def build_product_query(params):
         sql += " AND big_category = ?"
         values.append(params["big_category"])
 
-    if params["location"]:
-        sql += " AND location LIKE ?"
-        values.append(f"%{params['location']}%")
+    if params["supplier"]:
+        sql += " AND supplier LIKE ?"
+        values.append(f"%{params['supplier']}%")
 
     sql += " ORDER BY name ASC"
     return sql, values

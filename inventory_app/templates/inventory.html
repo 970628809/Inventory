@@ -5,9 +5,9 @@
     {% if is_admin %}
       <div class="d-flex gap-2">
         {% if edit_mode %}
-          <a href="{{ url_for('inventory', q=params.q, sku=params.sku, big_category=params.big_category, location=params.location) }}" class="btn btn-outline-secondary">修正終了</a>
+          <a href="{{ url_for('inventory', q=params.q, sku=params.sku, big_category=params.big_category, supplier=params.supplier) }}" class="btn btn-outline-secondary">修正終了</a>
         {% else %}
-          <a href="{{ url_for('inventory', edit=1, q=params.q, sku=params.sku, big_category=params.big_category, location=params.location) }}" class="btn btn-inventory-edit">在庫修正</a>
+          <a href="{{ url_for('inventory', edit=1, q=params.q, sku=params.sku, big_category=params.big_category, supplier=params.supplier) }}" class="btn btn-inventory-edit">在庫修正</a>
         {% endif %}
         <a href="{{ url_for('inventory_new') }}" class="btn btn-primary">新品追加</a>
       </div>
@@ -19,7 +19,7 @@
     <div class="btn-group" role="group">
       <a href="{{ url_for('inventory', edit=1 if edit_mode else none) }}" class="btn btn-sm {% if not params.big_category %}btn-primary{% else %}btn-outline-primary{% endif %}">すべて</a>
       {% for category in big_categories %}
-        <a href="{{ url_for('inventory', edit=1 if edit_mode else none, big_category=category, q=params.q, sku=params.sku, location=params.location) }}" class="btn btn-sm {% if params.big_category == category %}btn-primary{% else %}btn-outline-primary{% endif %}">{{ category }}</a>
+        <a href="{{ url_for('inventory', edit=1 if edit_mode else none, big_category=category, q=params.q, sku=params.sku, supplier=params.supplier) }}" class="btn btn-sm {% if params.big_category == category %}btn-primary{% else %}btn-outline-primary{% endif %}">{{ category }}</a>
       {% endfor %}
     </div>
   </div>
@@ -31,8 +31,8 @@
       <input type="text" name="q" value="{{ params.q }}" class="form-control" placeholder="検索...">
     </div>
     <div class="col-md-2">
-      <label class="form-label">保管場所</label>
-      <input type="text" name="location" value="{{ params.location }}" class="form-control" placeholder="棚・倉庫">
+      <label class="form-label">仕入れ先</label>
+      <input type="text" name="supplier" value="{{ params.supplier }}" class="form-control" placeholder="仕入れ先">
     </div>
     <div class="col-md-2">
       <label class="form-label">品番</label>
