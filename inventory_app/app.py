@@ -38,6 +38,9 @@ PRODUCT_COLUMNS = {
     "overview": "TEXT",
     "supplier": "TEXT",
     "amount": "TEXT",
+    "wholesale_price": "TEXT",
+    "tax_excluded_price": "TEXT",
+    "tax_included_price": "TEXT",
     "stock_status": "TEXT",
     "display_flag": "TEXT",
     "available_stock": "INTEGER NOT NULL DEFAULT 0",
@@ -199,6 +202,13 @@ def format_staff_stock_display(staff_stock_json):
 
 
 app.jinja_env.filters['format_staff_stock'] = format_staff_stock_display
+
+
+def is_store_display(value):
+    return str(value or "").strip() in {"○", "〇", "◯", "●", "◎", "丸", "あり", "有", "1", "true", "on"}
+
+
+app.jinja_env.filters["is_store_display"] = is_store_display
 
 
 @app.before_request
@@ -397,11 +407,14 @@ def build_product_query(params):
             "source_sheet",
             "category",
             "supplier",
+            "wholesale_price",
+            "tax_excluded_price",
+            "tax_included_price",
             "staff_stock_json",
         ]
         sql += " AND (" + " OR ".join([f"{searchable_column(column)} LIKE ?" for column in search_columns]) + ")"
         term = f"%{normalize_search_value(params['q'])}%"
-        values.extend([term] * 10)
+        values.extend([term] * len(search_columns))
 
     if params["sku"]:
         sql += f" AND {searchable_column('sku')} LIKE ?"
@@ -479,6 +492,10 @@ PRODUCT_SNAPSHOT_FIELDS = [
     "overview",
     "supplier",
     "amount",
+    "wholesale_price",
+    "tax_excluded_price",
+    "tax_included_price",
+    "display_flag",
     "sku",
     "available_stock",
     "current_stock",
@@ -589,8 +606,10 @@ def parse_inventory_row(sheet, sheet_name, row):
         sku = str(get_cell(sheet, row, 6)).strip()
         display_flag = str(get_cell(sheet, row, 7)).strip()
         available_stock = parse_int(get_cell(sheet, row, 8))
-        supplier = str(get_cell(sheet, row, 9)).strip()
-        amount = str(get_cell(sheet, row, 10)).strip()
+        supplier = ""
+        wholesale_price = str(get_cell(sheet, row, 9)).strip()
+        tax_excluded_price = str(get_cell(sheet, row, 10)).strip()
+        tax_included_price = str(get_cell(sheet, row, 11)).strip()
         total_stock = parse_int(get_cell(sheet, row, 12))
         notes = str(get_cell(sheet, row, 27)).strip()
         staff_stock = parse_staff_stock(sheet, row)
@@ -611,7 +630,10 @@ def parse_inventory_row(sheet, sheet_name, row):
             "maker_or_product": maker_or_product,
             "overview": overview,
             "supplier": supplier,
-            "amount": amount,
+            "amount": "",
+            "wholesale_price": wholesale_price,
+            "tax_excluded_price": tax_excluded_price,
+            "tax_included_price": tax_included_price,
             "sku": sku,
             "stock_status": stock_status,
             "display_flag": display_flag,
@@ -634,7 +656,7 @@ def parse_inventory_row(sheet, sheet_name, row):
         overview = str(get_cell(sheet, row, 7)).strip()
         sku = str(get_cell(sheet, row, 9)).strip()
         supplier = str(get_cell(sheet, row, 10)).strip()
-        amount = str(get_cell(sheet, row, 11)).strip()
+        tax_included_price = str(get_cell(sheet, row, 11)).strip()
         notes = str(get_cell(sheet, row, 20)).strip()
         big_category = str(get_cell(sheet, row, 6)).strip()
 
@@ -649,7 +671,10 @@ def parse_inventory_row(sheet, sheet_name, row):
             "maker_or_product": maker_or_product,
             "overview": overview,
             "supplier": supplier,
-            "amount": amount,
+            "amount": "",
+            "wholesale_price": "",
+            "tax_excluded_price": "",
+            "tax_included_price": tax_included_price,
             "sku": sku,
             "stock_status": stock_status,
             "display_flag": "",
@@ -699,7 +724,7 @@ def import_excel_file(file_stream):
                         continue
                     
                     conn.execute(
-                        "INSERT INTO products (source_sheet, source_row, big_category, maker_or_product, overview, supplier, amount, sku, stock_status, display_flag, available_stock, total_stock, reorder_point, staff_stock_json, notes, imported_at, current_stock, name, category, location, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "INSERT INTO products (source_sheet, source_row, big_category, maker_or_product, overview, supplier, amount, wholesale_price, tax_excluded_price, tax_included_price, sku, stock_status, display_flag, available_stock, total_stock, reorder_point, staff_stock_json, notes, imported_at, current_stock, name, category, location, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         (
                             record["source_sheet"],
                             record["source_row"],
@@ -708,6 +733,9 @@ def import_excel_file(file_stream):
                             record["overview"],
                             record["supplier"],
                             record["amount"],
+                            record["wholesale_price"],
+                            record["tax_excluded_price"],
+                            record["tax_included_price"],
                             record["sku"],
                             record["stock_status"],
                             record["display_flag"],
@@ -1241,7 +1269,10 @@ def inventory_new():
         overview = request.form.get("overview", "").strip()
         sku = request.form.get("sku", "").strip()
         supplier = request.form.get("supplier", "").strip()
-        amount = request.form.get("amount", "").strip()
+        wholesale_price = request.form.get("wholesale_price", "").strip()
+        tax_excluded_price = request.form.get("tax_excluded_price", "").strip()
+        tax_included_price = request.form.get("tax_included_price", "").strip()
+        display_flag = "○" if request.form.get("display_flag") == "1" else ""
         available_stock = parse_int(request.form.get("available_stock"))
         total_stock = parse_int(request.form.get("total_stock"))
         notes = request.form.get("notes", "").strip()
@@ -1268,7 +1299,7 @@ def inventory_new():
             now = now_jst_string()
             product_name = maker_or_product or sku or overview or supplier or "不明"
             cursor = conn.execute(
-                "INSERT INTO products (source_sheet, source_row, big_category, maker_or_product, overview, supplier, amount, sku, stock_status, display_flag, available_stock, total_stock, reorder_point, staff_stock_json, notes, imported_at, current_stock, name, category, location, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO products (source_sheet, source_row, big_category, maker_or_product, overview, supplier, amount, wholesale_price, tax_excluded_price, tax_included_price, sku, stock_status, display_flag, available_stock, total_stock, reorder_point, staff_stock_json, notes, imported_at, current_stock, name, category, location, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     source_sheet,
                     source_row,
@@ -1276,10 +1307,13 @@ def inventory_new():
                     maker_or_product,
                     overview,
                     supplier,
-                    amount,
+                    "",
+                    wholesale_price,
+                    tax_excluded_price,
+                    tax_included_price,
                     sku,
                     "",
-                    "",
+                    display_flag,
                     available_stock,
                     total_stock,
                     0,
@@ -1335,7 +1369,10 @@ def inventory_edit(product_id):
         maker_or_product = request.form.get("maker_or_product", "").strip()
         overview = request.form.get("overview", "").strip()
         supplier = request.form.get("supplier", "").strip()
-        amount = request.form.get("amount", "").strip()
+        wholesale_price = request.form.get("wholesale_price", "").strip()
+        tax_excluded_price = request.form.get("tax_excluded_price", "").strip()
+        tax_included_price = request.form.get("tax_included_price", "").strip()
+        display_flag = "○" if request.form.get("display_flag") == "1" else ""
         sku = request.form.get("sku", "").strip()
         available_stock = parse_int(request.form.get("available_stock"))
         total_stock = parse_int(request.form.get("total_stock"))
@@ -1369,7 +1406,11 @@ def inventory_edit(product_id):
                 "maker_or_product": maker_or_product,
                 "overview": overview,
                 "supplier": supplier,
-                "amount": amount,
+                "amount": "",
+                "wholesale_price": wholesale_price,
+                "tax_excluded_price": tax_excluded_price,
+                "tax_included_price": tax_included_price,
+                "display_flag": display_flag,
                 "sku": sku,
                 "available_stock": available_stock,
                 "current_stock": available_stock,
@@ -1384,7 +1425,8 @@ def inventory_edit(product_id):
                 """
                 UPDATE products
                 SET big_category = ?, maker_or_product = ?, overview = ?, supplier = ?,
-                    amount = ?, sku = ?, available_stock = ?, current_stock = ?,
+                    amount = ?, wholesale_price = ?, tax_excluded_price = ?, tax_included_price = ?,
+                    display_flag = ?, sku = ?, available_stock = ?, current_stock = ?,
                     total_stock = ?, staff_stock_json = ?, notes = ?, source_sheet = ?,
                     name = ?, category = ?, updated_at = ?
                 WHERE id = ?
@@ -1394,7 +1436,11 @@ def inventory_edit(product_id):
                     maker_or_product,
                     overview,
                     supplier,
-                    amount,
+                    "",
+                    wholesale_price,
+                    tax_excluded_price,
+                    tax_included_price,
+                    display_flag,
                     sku,
                     available_stock,
                     available_stock,
@@ -1513,6 +1559,7 @@ def stocktaking_edit(product_id):
     if request.method == "POST":
         new_stock = request.form.get("new_stock", type=int)
         reason = request.form.get("reason", "").strip()
+        display_flag = "○" if request.form.get("display_flag") == "1" else ""
         if new_stock is None or new_stock < 0:
             error_message = "正しい在庫数を入力してください。"
         elif not reason:
@@ -1521,8 +1568,8 @@ def stocktaking_edit(product_id):
             change = new_stock - product["current_stock"]
             now = now_jst_string()
             conn.execute(
-                "UPDATE products SET current_stock = ?, available_stock = ?, updated_at = ? WHERE id = ?",
-                (new_stock, new_stock, now, product_id),
+                "UPDATE products SET current_stock = ?, available_stock = ?, display_flag = ?, updated_at = ? WHERE id = ?",
+                (new_stock, new_stock, display_flag, now, product_id),
             )
             conn.execute(
                 "INSERT INTO stock_logs (product_id, operation_type, quantity, staff_name, note, created_at) VALUES (?, ?, ?, ?, ?, ?)",

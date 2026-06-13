@@ -39,8 +39,16 @@
       <input name="overview" class="form-control" value="{{ form_data.overview or '' }}">
     </div>
     <div class="col-md-2">
-      <label class="form-label">金額</label>
-      <input name="amount" class="form-control" value="{{ form_data.amount or '' }}">
+      <label class="form-label">卸価格(税抜)</label>
+      <input name="wholesale_price" class="form-control" value="{{ form_data.wholesale_price or '' }}">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">税別価格</label>
+      <input name="tax_excluded_price" class="form-control" value="{{ form_data.tax_excluded_price or '' }}">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">税込価格</label>
+      <input name="tax_included_price" class="form-control" value="{{ form_data.tax_included_price or '' }}">
     </div>
     <div class="col-md-2">
       <label class="form-label">販売可能台数</label>
@@ -60,7 +68,14 @@
       <label class="form-label">備考</label>
       <input name="notes" class="form-control" value="{{ form_data.notes or '' }}">
     </div>
-    <div class="col-md-6">
+    <div class="col-md-3">
+      <label class="form-label">店頭展示</label>
+      <div class="form-check pt-2">
+        <input class="form-check-input" type="checkbox" name="display_flag" value="1" id="displayFlag" {% if form_data.display_flag | is_store_display %}checked{% endif %}>
+        <label class="form-check-label" for="displayFlag">あり</label>
+      </div>
+    </div>
+    <div class="col-md-3">
       <label class="form-label">元シート</label>
       <input name="source_sheet" class="form-control" list="sourceSheetOptions" value="{{ form_data.source_sheet or '手動追加' }}">
       <datalist id="sourceSheetOptions">

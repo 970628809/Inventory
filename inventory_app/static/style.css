@@ -86,14 +86,14 @@ td.stock-table-overview small {
   width: 7.5rem;
 }
 
-.stock-table-amount {
-  max-width: 5.5rem;
-  width: 5.5rem;
+.stock-table-price {
+  max-width: 5.25rem;
+  width: 5.25rem;
 }
 
 .stock-table-supplier small,
 .stock-table-sku code,
-.stock-table-amount small {
+.stock-table-price small {
   overflow-wrap: anywhere;
 }
 
@@ -221,7 +221,7 @@ td.stock-table-notes small {
   }
 
   .stock-table {
-    min-width: 68rem;
+    min-width: 80rem;
   }
 
   .table th,

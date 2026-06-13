@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block content %}
   <h1>棚卸修正</h1>
-  <p>商品: <strong>{{ product.name }}</strong>（品番: {{ product.sku }}）</p>
+  <p>商品: <strong>{% if product.display_flag | is_store_display %}<span class="text-warning">★</span> {% endif %}{{ product.name }}</strong>（品番: {{ product.sku }}）</p>
   <p>現在在庫: <strong>{{ product.current_stock }}</strong></p>
 
   {% if error_message %}
@@ -16,6 +16,13 @@
     <div class="col-md-6">
       <label class="form-label">理由</label>
       <input type="text" name="reason" class="form-control" placeholder="例: 棚卸差異" required>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">店頭展示</label>
+      <div class="form-check pt-2">
+        <input class="form-check-input" type="checkbox" name="display_flag" value="1" id="displayFlag" {% if product.display_flag | is_store_display %}checked{% endif %}>
+        <label class="form-check-label" for="displayFlag">あり</label>
+      </div>
     </div>
     <div class="col-12">
       <button type="submit" class="btn btn-primary">修正を保存</button>

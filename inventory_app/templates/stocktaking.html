@@ -57,7 +57,9 @@
           <th class="stock-table-overview">概要</th>
           <th class="stock-table-supplier">仕入れ先</th>
           <th class="stock-table-sku">品番</th>
-          <th class="text-center stock-table-amount">金額</th>
+          <th class="text-center stock-table-price">卸価格(税抜)</th>
+          <th class="text-center stock-table-price">税別価格</th>
+          <th class="text-center stock-table-price">税込価格</th>
           <th class="text-center">現在在庫</th>
           <th class="text-center">総台数</th>
           <th class="stock-table-staff">担当者別販売台数</th>
@@ -71,11 +73,13 @@
         {% for product in products %}
           <tr id="product-{{ product.id }}" class="{% if product.id in checked_product_ids %}table-success{% endif %}">
             <td class="text-center"><span class="badge bg-primary">{{ product.big_category }}</span></td>
-            <td><strong>{{ product.maker_or_product }}</strong></td>
+            <td><strong>{% if product.display_flag | is_store_display %}<span class="text-warning">★</span> {% endif %}{{ product.maker_or_product }}</strong></td>
             <td class="stock-table-overview"><small>{{ product.overview }}</small></td>
             <td class="stock-table-supplier"><small>{{ product.supplier }}</small></td>
             <td class="stock-table-sku"><code>{{ product.sku }}</code></td>
-            <td class="text-center stock-table-amount"><small>{{ product.amount }}</small></td>
+            <td class="text-center stock-table-price"><small>{{ product.wholesale_price }}</small></td>
+            <td class="text-center stock-table-price"><small>{{ product.tax_excluded_price }}</small></td>
+            <td class="text-center stock-table-price"><small>{{ product.tax_included_price }}</small></td>
             <td class="text-center"><strong>{{ product.current_stock }}</strong></td>
             <td class="text-center">{{ product.total_stock }}</td>
             <td class="stock-table-staff"><small>{{ product.staff_stock_json | format_staff_stock }}</small></td>
