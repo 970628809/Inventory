@@ -63,7 +63,7 @@
           <th class="text-center stock-table-price">税込価格</th>
           <th class="text-center stock-table-available">販売可能台数</th>
           <th class="text-center">総台数</th>
-          <th class="stock-table-staff">担当者別台数</th>
+          <th class="stock-table-staff">{{ '担当者別台数' if is_admin else '担当数量' }}</th>
           <th class="stock-table-notes">備考</th>
           {% if is_admin %}
             <th class="text-center stock-table-actions-col">操作</th>
@@ -95,7 +95,17 @@
             <td class="text-center stock-table-price"><small>{{ product.tax_included_price }}</small></td>
             <td class="text-center stock-table-available"><strong>{{ product.available_stock }}</strong></td>
             <td class="text-center">{{ product.total_stock }}</td>
-            <td class="stock-table-staff"><small>{{ product.staff_stock_json | format_staff_stock }}</small></td>
+            <td class="stock-table-staff">
+              {% if is_admin %}
+                <small>{{ product.staff_stock_json | format_staff_stock }}</small>
+              {% elif product.staff_stock_json | staff_has_key(current_user.username) %}
+                <button type="button" class="btn btn-sm btn-light staff-quantity-btn" data-product-id="{{ product.id }}" data-quantity="{{ product.staff_stock_json | staff_quantity_for(current_user.username) }}">
+                  {{ product.staff_stock_json | staff_quantity_for(current_user.username) }}
+                </button>
+              {% else %}
+                <small>-</small>
+              {% endif %}
+            </td>
             <td class="stock-table-notes"><small>{{ product.notes }}</small></td>
             {% if is_admin %}
               <td class="stock-table-actions-col">
@@ -113,7 +123,7 @@
           </tr>
         {% else %}
           <tr>
-            <td colspan="{{ 11 if is_admin else 10 }}" class="text-center text-muted py-4">
+            <td colspan="{{ 13 if is_admin else 12 }}" class="text-center text-muted py-4">
               <i class="bi bi-inbox"></i> 該当する商品が見つかりません。
             </td>
           </tr>
@@ -121,4 +131,37 @@
       </tbody>
     </table>
   </div>
+  {% if not is_admin %}
+    <script>
+      document.querySelectorAll(".staff-quantity-btn").forEach((button) => {
+        button.addEventListener("dblclick", async () => {
+          const current = button.dataset.quantity || "0";
+          const next = window.prompt("担当数量を入力してください", current);
+          if (next === null) return;
+          const quantity = Number.parseInt(next, 10);
+          if (!Number.isInteger(quantity) || quantity < 0) {
+            window.alert("0以上の数字を入力してください。");
+            return;
+          }
+
+          const body = new URLSearchParams({ quantity: String(quantity) });
+          const response = await fetch(`/inventory/staff_quantity/${button.dataset.productId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body,
+          });
+          const result = await response.json();
+          if (!response.ok || !result.ok) {
+            window.alert(result.message || "更新できませんでした。");
+            return;
+          }
+          button.dataset.quantity = String(result.quantity);
+          button.textContent = String(result.quantity);
+          const row = button.closest("tr");
+          const stockCell = row ? row.querySelector(".stock-table-available strong") : null;
+          if (stockCell) stockCell.textContent = String(result.current_stock);
+        });
+      });
+    </script>
+  {% endif %}
 {% endblock %}

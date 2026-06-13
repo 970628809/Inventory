@@ -204,6 +204,32 @@ def format_staff_stock_display(staff_stock_json):
 app.jinja_env.filters['format_staff_stock'] = format_staff_stock_display
 
 
+def staff_quantity_for(staff_stock_json, staff_name):
+    if not staff_name:
+        return 0
+    try:
+        data = json.loads(staff_stock_json or "{}")
+    except Exception:
+        return 0
+    return parse_int(data.get(staff_name, 0))
+
+
+app.jinja_env.filters["staff_quantity_for"] = staff_quantity_for
+
+
+def staff_has_key(staff_stock_json, staff_name):
+    if not staff_name:
+        return False
+    try:
+        data = json.loads(staff_stock_json or "{}")
+    except Exception:
+        return False
+    return staff_name in data
+
+
+app.jinja_env.filters["staff_has_key"] = staff_has_key
+
+
 def is_store_display(value):
     return str(value or "").strip() in {"○", "〇", "◯", "●", "◎", "丸", "あり", "有", "1", "true", "on"}
 
@@ -1387,6 +1413,63 @@ def inventory_assign(product_id):
         assigned_total=assigned_total,
         error_message=error_message,
     )
+
+
+@app.route("/inventory/staff_quantity/<int:product_id>", methods=["POST"])
+@login_required
+def update_staff_quantity(product_id):
+    staff_name = g.user["username"]
+    new_quantity = request.form.get("quantity", type=int)
+    if new_quantity is None or new_quantity < 0:
+        return {"ok": False, "message": "正しい台数を入力してください。"}, 400
+
+    conn = get_db_connection()
+    product = conn.execute("SELECT * FROM products WHERE id = ?", (product_id,)).fetchone()
+    if product is None:
+        conn.close()
+        return {"ok": False, "message": "商品が見つかりません。"}, 404
+
+    try:
+        staff_stock = json.loads(product["staff_stock_json"] or "{}")
+    except Exception:
+        staff_stock = {}
+
+    if staff_name not in staff_stock:
+        conn.close()
+        return {"ok": False, "message": "この商品に担当者番号がありません。"}, 403
+
+    old_quantity = parse_int(staff_stock.get(staff_name, 0))
+    delta = new_quantity - old_quantity
+    if delta > 0 and delta > product["current_stock"]:
+        conn.close()
+        return {"ok": False, "message": "在庫が不足しています。"}, 400
+
+    today = now_jst().date().isoformat()
+    new_stock = product["current_stock"] - delta
+    staff_stock[staff_name] = new_quantity
+    conn.execute(
+        "UPDATE products SET current_stock = ?, available_stock = ?, staff_stock_json = ?, last_out_date = ?, updated_at = ? WHERE id = ?",
+        (
+            new_stock,
+            new_stock,
+            json.dumps(staff_stock, ensure_ascii=False),
+            today if delta > 0 else product["last_out_date"],
+            now_jst_string(),
+            product_id,
+        ),
+    )
+
+    if delta != 0:
+        operation_type = "outbound" if delta > 0 else "modification"
+        note = "担当数量入力" if delta > 0 else "担当数量修正"
+        conn.execute(
+            "INSERT INTO stock_logs (product_id, operation_type, quantity, staff_name, note, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (product_id, operation_type, abs(delta), staff_name, note, now_jst_string()),
+        )
+
+    conn.commit()
+    conn.close()
+    return {"ok": True, "quantity": new_quantity, "current_stock": new_stock}
 
 
 @app.route("/inventory/edit/<int:product_id>", methods=["GET", "POST"])
