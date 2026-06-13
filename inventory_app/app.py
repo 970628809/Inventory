@@ -281,6 +281,16 @@ def format_staff_summary_text(staff_stock_json, staff_memo_json=None):
 app.jinja_env.filters["format_staff_summary_text"] = format_staff_summary_text
 
 
+def format_staff_summary_display(staff_stock_json, staff_memo_json=None):
+    text = format_staff_summary_text(staff_stock_json, staff_memo_json)
+    if text == "-":
+        return "-"
+    return Markup("<br>".join(escape(line) for line in text.splitlines()))
+
+
+app.jinja_env.filters["format_staff_summary"] = format_staff_summary_display
+
+
 def is_store_display(value):
     return str(value or "").strip() in {"○", "〇", "◯", "●", "◎", "丸", "あり", "有", "1", "true", "on"}
 
@@ -583,18 +593,42 @@ def parse_staff_stock_form():
     return staff_stock
 
 
-def staff_stock_form_rows(staff_stock_json=None, min_rows=3):
+def parse_staff_memo_form():
+    staff_memos = {}
+    names = request.form.getlist("staff_name")
+    memos = request.form.getlist("staff_memo")
+    for name, memo in zip(names, memos):
+        name = name.strip()
+        memo = memo.strip()
+        if name and memo:
+            staff_memos[name] = memo
+    return staff_memos
+
+
+def staff_stock_form_rows(staff_stock_json=None, staff_memo_json=None, min_rows=3):
     rows = []
+    memos = {}
+    if staff_memo_json:
+        try:
+            memos = json.loads(staff_memo_json)
+        except Exception:
+            memos = {}
     if staff_stock_json:
         try:
             rows = [
-                {"name": name, "quantity": quantity}
+                {"name": name, "quantity": quantity, "memo": memos.get(name, "")}
                 for name, quantity in json.loads(staff_stock_json).items()
             ]
         except Exception:
             rows = []
+    existing_names = {row["name"] for row in rows}
+    rows.extend(
+        {"name": name, "quantity": "", "memo": memo}
+        for name, memo in memos.items()
+        if name not in existing_names
+    )
     while len(rows) < min_rows:
-        rows.append({"name": "", "quantity": ""})
+        rows.append({"name": "", "quantity": "", "memo": ""})
     return rows
 
 
@@ -1467,21 +1501,31 @@ def inventory_assign(product_id):
 
     options = get_inventory_form_options(conn)
     error_message = None
-    staff_rows = staff_stock_form_rows(product["staff_stock_json"], min_rows=5)
+    staff_rows = staff_stock_form_rows(product["staff_stock_json"], product["staff_memo_json"], min_rows=5)
 
     if request.method == "POST":
         staff_stock = parse_staff_stock_form()
-        staff_rows = staff_stock_form_rows(json.dumps(staff_stock, ensure_ascii=False), min_rows=5)
+        staff_memos = parse_staff_memo_form()
+        staff_rows = staff_stock_form_rows(
+            json.dumps(staff_stock, ensure_ascii=False),
+            json.dumps(staff_memos, ensure_ascii=False),
+            min_rows=5,
+        )
         if any(quantity < 0 for quantity in staff_stock.values()):
             error_message = "台数は0以上で入力してください。"
         else:
             conn.execute(
-                "UPDATE products SET staff_stock_json = ?, updated_at = ? WHERE id = ?",
-                (json.dumps(staff_stock, ensure_ascii=False), now_jst_string(), product_id),
+                "UPDATE products SET staff_stock_json = ?, staff_memo_json = ?, updated_at = ? WHERE id = ?",
+                (
+                    json.dumps(staff_stock, ensure_ascii=False),
+                    json.dumps(staff_memos, ensure_ascii=False),
+                    now_jst_string(),
+                    product_id,
+                ),
             )
             conn.commit()
             conn.close()
-            flash("担当者別台数を更新しました。", "success")
+            flash("担当割当を更新しました。", "success")
             return redirect(url_for("inventory_assign", product_id=product_id))
 
     conn.close()

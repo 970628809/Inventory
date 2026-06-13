@@ -97,7 +97,7 @@
             <td class="text-center">{{ product.total_stock }}</td>
             <td class="stock-table-staff">
               {% if is_admin %}
-                <small>{{ product.staff_stock_json | format_staff_stock }}</small>
+                <small>{{ product.staff_stock_json | format_staff_summary(product.staff_memo_json) }}</small>
               {% elif product.staff_stock_json | staff_has_key(current_user.username) %}
                 <button type="button" class="btn btn-sm btn-light staff-quantity-btn" data-product-id="{{ product.id }}" data-quantity="{{ product.staff_stock_json | staff_quantity_for(current_user.username) }}" data-memo="{{ product.staff_memo_json | staff_memo_for(current_user.username) | e }}">
                   {{ product.staff_stock_json | staff_quantity_for(current_user.username) }}

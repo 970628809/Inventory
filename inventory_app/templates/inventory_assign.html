@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block content %}
   <div class="d-flex justify-content-between align-items-center mb-3">
-    <h1 class="mb-0">担当者分配</h1>
+    <h1 class="mb-0">担当割当</h1>
     <a href="{{ url_for('inventory') }}" class="btn btn-outline-secondary">在庫一覧に戻る</a>
   </div>
 
@@ -25,7 +25,7 @@
           <strong>{{ product.available_stock }}</strong>
         </div>
         <div class="col-md-2">
-          <small class="text-muted d-block">分配合計</small>
+          <small class="text-muted d-block">割当合計</small>
           <strong>{{ assigned_total }}</strong>
         </div>
       </div>
@@ -37,11 +37,14 @@
       <label class="form-label">担当者別台数</label>
       <div class="row gy-2">
         {% for row in staff_rows %}
-          <div class="col-md-6">
+          <div class="col-md-3">
             <input name="staff_name" class="form-control" list="staffOptions" placeholder="担当者番号" value="{{ row.name }}">
           </div>
-          <div class="col-md-6">
+          <div class="col-md-3">
             <input type="number" name="staff_quantity" class="form-control" list="quantityOptions" min="0" placeholder="台数" value="{{ row.quantity }}">
+          </div>
+          <div class="col-md-6">
+            <input name="staff_memo" class="form-control" placeholder="memo" value="{{ row.memo }}">
           </div>
         {% endfor %}
       </div>
@@ -58,7 +61,7 @@
     </div>
 
     <div class="col-12">
-      <button type="submit" class="btn btn-primary">分配を保存</button>
+      <button type="submit" class="btn btn-primary">割当を保存</button>
       <a href="{{ url_for('inventory') }}" class="btn btn-outline-secondary">戻る</a>
     </div>
   </form>

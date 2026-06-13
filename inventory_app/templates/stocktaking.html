@@ -82,7 +82,7 @@
             <td class="text-center stock-table-price"><small>{{ product.tax_included_price }}</small></td>
             <td class="text-center"><strong>{{ product.current_stock }}</strong></td>
             <td class="text-center">{{ product.total_stock }}</td>
-            <td class="stock-table-staff"><small>{{ product.staff_stock_json | format_staff_stock }}</small></td>
+            <td class="stock-table-staff"><small>{{ product.staff_stock_json | format_staff_summary(product.staff_memo_json) }}</small></td>
             <td class="stock-table-notes"><small>{{ product.notes }}</small></td>
             {% if can_manage_inventory %}
               <td class="text-center">
