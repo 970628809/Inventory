@@ -410,7 +410,6 @@ def account():
                         "UPDATE users SET username = ?, password_hash = ? WHERE id = ?",
                         (username, password_hash, g.user["id"]),
                     )
-                    rename_staff_stock_key(conn, user["username"], username)
                     conn.commit()
                     flash("アカウント情報を更新しました。", "success")
                     return redirect(url_for("account"))
@@ -572,28 +571,6 @@ def adjust_staff_sales_json(staff_stock_json, staff_name, delta):
     current = parse_int(data.get(staff_name, 0))
     data[staff_name] = max(0, current + delta)
     return json.dumps(data, ensure_ascii=False)
-
-
-def rename_staff_stock_key(conn, old_name, new_name):
-    if not old_name or not new_name or old_name == new_name:
-        return
-    rows = conn.execute(
-        "SELECT id, staff_stock_json FROM products WHERE staff_stock_json IS NOT NULL AND staff_stock_json != ''"
-    ).fetchall()
-    for row in rows:
-        try:
-            data = json.loads(row["staff_stock_json"] or "{}")
-        except Exception:
-            continue
-        if old_name not in data:
-            continue
-        old_quantity = parse_int(data.pop(old_name))
-        if old_quantity != 0:
-            data[new_name] = parse_int(data.get(new_name, 0)) + old_quantity
-        conn.execute(
-            "UPDATE products SET staff_stock_json = ? WHERE id = ?",
-            (json.dumps(data, ensure_ascii=False), row["id"]),
-        )
 
 
 PRODUCT_SNAPSHOT_FIELDS = [
