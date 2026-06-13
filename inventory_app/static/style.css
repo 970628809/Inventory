@@ -124,6 +124,10 @@ td.stock-table-staff small {
   font-weight: 700;
 }
 
+.staff-summary-btn {
+  padding: 0.125rem 0.4rem;
+}
+
 .stock-table-notes {
   max-width: 8.5rem;
   width: 8.5rem;

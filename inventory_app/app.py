@@ -204,6 +204,20 @@ def format_staff_stock_display(staff_stock_json):
 app.jinja_env.filters['format_staff_stock'] = format_staff_stock_display
 
 
+def format_staff_stock_text(staff_stock_json):
+    if not staff_stock_json:
+        return "-"
+    try:
+        data = json.loads(staff_stock_json)
+        lines = [f"{name}: {quantity}" for name, quantity in data.items() if parse_int(quantity) != 0]
+        return "\n".join(lines) if lines else "-"
+    except Exception:
+        return "-"
+
+
+app.jinja_env.filters["format_staff_stock_text"] = format_staff_stock_text
+
+
 def staff_quantity_for(staff_stock_json, staff_name):
     if not staff_name:
         return 0

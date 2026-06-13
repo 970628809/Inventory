@@ -34,6 +34,7 @@
               <button type="button" class="btn btn-sm btn-light staff-quantity-btn" data-product-id="{{ product.id }}" data-quantity="{{ row.quantity }}">
                 {{ row.quantity }}
               </button>
+              <button type="button" class="btn btn-sm btn-outline-secondary staff-summary-btn" data-staff-summary="{{ product.staff_stock_json | format_staff_stock_text | e }}">他</button>
             </td>
             <td class="stock-table-notes"><small>{{ product.notes }}</small></td>
           </tr>
@@ -74,6 +75,11 @@
         const row = button.closest("tr");
         const stockCell = row ? row.querySelector(".stock-table-available strong") : null;
         if (stockCell) stockCell.textContent = String(result.current_stock);
+      });
+    });
+    document.querySelectorAll(".staff-summary-btn").forEach((button) => {
+      button.addEventListener("click", () => {
+        window.alert(button.dataset.staffSummary || "-");
       });
     });
   </script>
