@@ -25,6 +25,7 @@ PRODUCT_COLUMNS = {
     "available_stock": "INTEGER NOT NULL DEFAULT 0",
     "total_stock": "INTEGER NOT NULL DEFAULT 0",
     "staff_stock_json": "TEXT",
+    "staff_memo_json": "TEXT",
     "imported_at": "TEXT",
 }
 
@@ -113,6 +114,7 @@ def create_db(reset=False):
             total_stock INTEGER NOT NULL DEFAULT 0,
             reorder_point INTEGER NOT NULL DEFAULT 0,
             staff_stock_json TEXT,
+            staff_memo_json TEXT,
             notes TEXT,
             imported_at TEXT,
             current_stock INTEGER NOT NULL DEFAULT 0,

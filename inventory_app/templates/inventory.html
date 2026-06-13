@@ -99,10 +99,10 @@
               {% if is_admin %}
                 <small>{{ product.staff_stock_json | format_staff_stock }}</small>
               {% elif product.staff_stock_json | staff_has_key(current_user.username) %}
-                <button type="button" class="btn btn-sm btn-light staff-quantity-btn" data-product-id="{{ product.id }}" data-quantity="{{ product.staff_stock_json | staff_quantity_for(current_user.username) }}">
+                <button type="button" class="btn btn-sm btn-light staff-quantity-btn" data-product-id="{{ product.id }}" data-quantity="{{ product.staff_stock_json | staff_quantity_for(current_user.username) }}" data-memo="{{ product.staff_memo_json | staff_memo_for(current_user.username) | e }}">
                   {{ product.staff_stock_json | staff_quantity_for(current_user.username) }}
                 </button>
-                <button type="button" class="btn btn-sm btn-secondary staff-summary-btn" data-staff-summary="{{ product.staff_stock_json | format_staff_stock_text | e }}">他</button>
+                <button type="button" class="btn btn-sm btn-secondary staff-summary-btn" data-staff-summary="{{ product.staff_stock_json | format_staff_summary_text(product.staff_memo_json) | e }}">他</button>
               {% else %}
                 <small>-</small>
               {% endif %}
@@ -143,8 +143,11 @@
             window.alert("0以上の数字を入力してください。");
             return;
           }
+          const memo = window.prompt("顧客名、台数及び工事時間を入力してください（任意）", button.dataset.memo || "");
+          if (memo === null) return;
+          if (!window.confirm("この内容で更新しますか？")) return;
 
-          const body = new URLSearchParams({ quantity: String(quantity) });
+          const body = new URLSearchParams({ quantity: String(quantity), memo });
           const response = await fetch(`/inventory/staff_quantity/${button.dataset.productId}`, {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -156,7 +159,10 @@
             return;
           }
           button.dataset.quantity = String(result.quantity);
+          button.dataset.memo = result.memo || "";
           button.textContent = String(result.quantity);
+          const summaryButton = button.parentElement ? button.parentElement.querySelector(".staff-summary-btn") : null;
+          if (summaryButton && result.summary) summaryButton.dataset.staffSummary = result.summary;
           const row = button.closest("tr");
           const stockCell = row ? row.querySelector(".stock-table-available strong") : null;
           if (stockCell) stockCell.textContent = String(result.current_stock);

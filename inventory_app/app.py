@@ -46,6 +46,7 @@ PRODUCT_COLUMNS = {
     "available_stock": "INTEGER NOT NULL DEFAULT 0",
     "total_stock": "INTEGER NOT NULL DEFAULT 0",
     "staff_stock_json": "TEXT",
+    "staff_memo_json": "TEXT",
     "imported_at": "TEXT",
 }
 
@@ -242,6 +243,42 @@ def staff_has_key(staff_stock_json, staff_name):
 
 
 app.jinja_env.filters["staff_has_key"] = staff_has_key
+
+
+def staff_memo_for(staff_memo_json, staff_name):
+    if not staff_name:
+        return ""
+    try:
+        data = json.loads(staff_memo_json or "{}")
+    except Exception:
+        return ""
+    return str(data.get(staff_name, "") or "")
+
+
+app.jinja_env.filters["staff_memo_for"] = staff_memo_for
+
+
+def format_staff_summary_text(staff_stock_json, staff_memo_json=None):
+    try:
+        staff_stock = json.loads(staff_stock_json or "{}")
+    except Exception:
+        staff_stock = {}
+    try:
+        staff_memos = json.loads(staff_memo_json or "{}")
+    except Exception:
+        staff_memos = {}
+
+    lines = []
+    for name, quantity in staff_stock.items():
+        quantity = parse_int(quantity)
+        if quantity == 0:
+            continue
+        memo = str(staff_memos.get(name, "") or "").strip()
+        lines.append(f"{name}: {quantity}" + (f" / {memo}" if memo else ""))
+    return "\n".join(lines) if lines else "-"
+
+
+app.jinja_env.filters["format_staff_summary_text"] = format_staff_summary_text
 
 
 def is_store_display(value):
@@ -676,6 +713,21 @@ def parse_staff_stock(sheet, row):
     return values
 
 
+def parse_staff_memo(sheet, row):
+    values = {}
+    for col in range(13, 27):
+        header = sheet.cell(row=2, column=col).value
+        if header is None:
+            continue
+        header = str(header).strip()
+        if not header:
+            continue
+        comment = sheet.cell(row=row, column=col).comment
+        if comment and comment.text:
+            values[header] = str(comment.text).strip()
+    return values
+
+
 NORMAL_SHEETS = {
     "エアコン在庫": "エアコン",
     "エアコン": "エアコン",
@@ -705,6 +757,7 @@ def parse_inventory_row(sheet, sheet_name, row):
         total_stock = parse_int(get_cell(sheet, row, 12))
         notes = str(get_cell(sheet, row, 27)).strip()
         staff_stock = parse_staff_stock(sheet, row)
+        staff_memo = parse_staff_memo(sheet, row)
 
         if not sku and not maker_or_product and not overview:
             return None
@@ -733,6 +786,7 @@ def parse_inventory_row(sheet, sheet_name, row):
             "total_stock": total_stock,
             "reorder_point": reorder_point,
             "staff_stock_json": json.dumps(staff_stock, ensure_ascii=False),
+            "staff_memo_json": json.dumps(staff_memo, ensure_ascii=False),
             "notes": notes,
             "imported_at": now_jst_string(),
             "current_stock": available_stock,
@@ -775,7 +829,7 @@ def import_excel_file(file_stream):
                         continue
                     
                     conn.execute(
-                        "INSERT INTO products (source_sheet, source_row, big_category, maker_or_product, overview, supplier, amount, wholesale_price, tax_excluded_price, tax_included_price, sku, stock_status, display_flag, available_stock, total_stock, reorder_point, staff_stock_json, notes, imported_at, current_stock, name, category, location, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "INSERT INTO products (source_sheet, source_row, big_category, maker_or_product, overview, supplier, amount, wholesale_price, tax_excluded_price, tax_included_price, sku, stock_status, display_flag, available_stock, total_stock, reorder_point, staff_stock_json, staff_memo_json, notes, imported_at, current_stock, name, category, location, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         (
                             record["source_sheet"],
                             record["source_row"],
@@ -794,6 +848,7 @@ def import_excel_file(file_stream):
                             record["total_stock"],
                             record["reorder_point"],
                             record["staff_stock_json"],
+                            record["staff_memo_json"],
                             record["notes"],
                             record["imported_at"],
                             record["current_stock"],
@@ -1350,7 +1405,7 @@ def inventory_new():
             now = now_jst_string()
             product_name = maker_or_product or sku or overview or supplier or "不明"
             cursor = conn.execute(
-                "INSERT INTO products (source_sheet, source_row, big_category, maker_or_product, overview, supplier, amount, wholesale_price, tax_excluded_price, tax_included_price, sku, stock_status, display_flag, available_stock, total_stock, reorder_point, staff_stock_json, notes, imported_at, current_stock, name, category, location, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO products (source_sheet, source_row, big_category, maker_or_product, overview, supplier, amount, wholesale_price, tax_excluded_price, tax_included_price, sku, stock_status, display_flag, available_stock, total_stock, reorder_point, staff_stock_json, staff_memo_json, notes, imported_at, current_stock, name, category, location, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     source_sheet,
                     source_row,
@@ -1369,6 +1424,7 @@ def inventory_new():
                     total_stock,
                     0,
                     json.dumps(staff_stock, ensure_ascii=False),
+                    "{}",
                     notes,
                     now,
                     available_stock,
@@ -1453,7 +1509,11 @@ def my_staff_products():
     for product in products:
         quantity = staff_quantity_for(product["staff_stock_json"], staff_name)
         if quantity > 0:
-            rows.append({"product": product, "quantity": quantity})
+            rows.append({
+                "product": product,
+                "quantity": quantity,
+                "memo": staff_memo_for(product["staff_memo_json"], staff_name),
+            })
             total += quantity
 
     return render_template(
@@ -1469,6 +1529,7 @@ def my_staff_products():
 def update_staff_quantity(product_id):
     staff_name = g.user["username"]
     new_quantity = request.form.get("quantity", type=int)
+    memo = request.form.get("memo", "").strip()
     if new_quantity is None or new_quantity < 0:
         return {"ok": False, "message": "正しい台数を入力してください。"}, 400
 
@@ -1482,6 +1543,10 @@ def update_staff_quantity(product_id):
         staff_stock = json.loads(product["staff_stock_json"] or "{}")
     except Exception:
         staff_stock = {}
+    try:
+        staff_memos = json.loads(product["staff_memo_json"] or "{}")
+    except Exception:
+        staff_memos = {}
 
     if staff_name not in staff_stock:
         conn.close()
@@ -1496,12 +1561,17 @@ def update_staff_quantity(product_id):
     today = now_jst().date().isoformat()
     new_stock = product["current_stock"] - delta
     staff_stock[staff_name] = new_quantity
+    if memo:
+        staff_memos[staff_name] = memo
+    else:
+        staff_memos.pop(staff_name, None)
     conn.execute(
-        "UPDATE products SET current_stock = ?, available_stock = ?, staff_stock_json = ?, last_out_date = ?, updated_at = ? WHERE id = ?",
+        "UPDATE products SET current_stock = ?, available_stock = ?, staff_stock_json = ?, staff_memo_json = ?, last_out_date = ?, updated_at = ? WHERE id = ?",
         (
             new_stock,
             new_stock,
             json.dumps(staff_stock, ensure_ascii=False),
+            json.dumps(staff_memos, ensure_ascii=False),
             today if delta > 0 else product["last_out_date"],
             now_jst_string(),
             product_id,
@@ -1510,7 +1580,7 @@ def update_staff_quantity(product_id):
 
     if delta != 0:
         operation_type = "outbound" if delta > 0 else "modification"
-        note = "担当数量入力" if delta > 0 else "担当数量修正"
+        note = memo or ("担当数量入力" if delta > 0 else "担当数量修正")
         conn.execute(
             "INSERT INTO stock_logs (product_id, operation_type, quantity, staff_name, note, created_at) VALUES (?, ?, ?, ?, ?, ?)",
             (product_id, operation_type, abs(delta), staff_name, note, now_jst_string()),
@@ -1518,7 +1588,13 @@ def update_staff_quantity(product_id):
 
     conn.commit()
     conn.close()
-    return {"ok": True, "quantity": new_quantity, "current_stock": new_stock}
+    return {
+        "ok": True,
+        "quantity": new_quantity,
+        "memo": memo,
+        "current_stock": new_stock,
+        "summary": format_staff_summary_text(json.dumps(staff_stock, ensure_ascii=False), json.dumps(staff_memos, ensure_ascii=False)),
+    }
 
 
 @app.route("/inventory/edit/<int:product_id>", methods=["GET", "POST"])

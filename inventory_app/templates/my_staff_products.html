@@ -9,11 +9,11 @@
   </div>
 
   <div class="table-responsive">
-    <table class="table table-bordered table-hover align-middle table-sm stock-table">
+    <table class="table table-bordered table-hover align-middle table-sm stock-table my-staff-table">
       <thead class="table-dark sticky-top">
         <tr>
           <th class="text-center">大分類</th>
-          <th>メーカー/商品</th>
+          <th class="my-staff-maker">メーカー/商品</th>
           <th class="stock-table-overview">概要</th>
           <th class="stock-table-sku">品番</th>
           <th class="text-center stock-table-available">販売可能台数</th>
@@ -26,15 +26,18 @@
           {% set product = row.product %}
           <tr>
             <td class="text-center"><span class="badge bg-primary">{{ product.big_category }}</span></td>
-            <td><strong>{% if product.display_flag | is_store_display %}<span class="text-warning">★</span> {% endif %}{{ product.maker_or_product }}</strong></td>
+            <td class="my-staff-maker"><strong>{% if product.display_flag | is_store_display %}<span class="text-warning">★</span> {% endif %}{{ product.maker_or_product }}</strong></td>
             <td class="stock-table-overview"><small>{{ product.overview }}</small></td>
             <td class="stock-table-sku"><code>{{ product.sku }}</code></td>
             <td class="text-center stock-table-available"><strong>{{ product.available_stock }}</strong></td>
             <td class="text-center stock-table-staff">
-              <button type="button" class="btn btn-sm btn-light staff-quantity-btn" data-product-id="{{ product.id }}" data-quantity="{{ row.quantity }}">
-                {{ row.quantity }}
-              </button>
-              <button type="button" class="btn btn-sm btn-secondary staff-summary-btn" data-staff-summary="{{ product.staff_stock_json | format_staff_stock_text | e }}">他</button>
+              <div class="staff-control-group">
+                <button type="button" class="btn btn-sm btn-light staff-quantity-btn" data-product-id="{{ product.id }}" data-quantity="{{ row.quantity }}" data-memo="{{ row.memo | e }}">
+                  {{ row.quantity }}
+                </button>
+                <input type="text" class="form-control form-control-sm staff-memo-input" value="{{ row.memo }}" placeholder="memo" aria-label="memo">
+                <button type="button" class="btn btn-sm btn-secondary staff-summary-btn" data-staff-summary="{{ product.staff_stock_json | format_staff_summary_text(product.staff_memo_json) | e }}">他</button>
+              </div>
             </td>
             <td class="stock-table-notes"><small>{{ product.notes }}</small></td>
           </tr>
@@ -48,6 +51,32 @@
   </div>
 
   <script>
+    async function updateStaffQuantity(button, quantity, memo) {
+      const body = new URLSearchParams({ quantity: String(quantity), memo });
+      const response = await fetch(`/inventory/staff_quantity/${button.dataset.productId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body,
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) {
+        window.alert(result.message || "更新できませんでした。");
+        return null;
+      }
+      button.dataset.quantity = String(result.quantity);
+      button.dataset.memo = result.memo || "";
+      button.textContent = String(result.quantity);
+      const group = button.closest(".staff-control-group");
+      const memoInput = group ? group.querySelector(".staff-memo-input") : null;
+      const summaryButton = group ? group.querySelector(".staff-summary-btn") : null;
+      if (memoInput) memoInput.value = result.memo || "";
+      if (summaryButton && result.summary) summaryButton.dataset.staffSummary = result.summary;
+      const row = button.closest("tr");
+      const stockCell = row ? row.querySelector(".stock-table-available strong") : null;
+      if (stockCell) stockCell.textContent = String(result.current_stock);
+      return result;
+    }
+
     document.querySelectorAll(".staff-quantity-btn").forEach((button) => {
       button.addEventListener("dblclick", async () => {
         const current = button.dataset.quantity || "0";
@@ -58,23 +87,21 @@
           window.alert("0以上の数字を入力してください。");
           return;
         }
+        const memo = window.prompt("顧客名、台数及び工事時間を入力してください（任意）", button.dataset.memo || "");
+        if (memo === null) return;
+        if (!window.confirm("この内容で更新しますか？")) return;
 
-        const body = new URLSearchParams({ quantity: String(quantity) });
-        const response = await fetch(`/inventory/staff_quantity/${button.dataset.productId}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body,
-        });
-        const result = await response.json();
-        if (!response.ok || !result.ok) {
-          window.alert(result.message || "更新できませんでした。");
-          return;
-        }
-        button.dataset.quantity = String(result.quantity);
-        button.textContent = String(result.quantity);
-        const row = button.closest("tr");
-        const stockCell = row ? row.querySelector(".stock-table-available strong") : null;
-        if (stockCell) stockCell.textContent = String(result.current_stock);
+        await updateStaffQuantity(button, quantity, memo);
+      });
+    });
+    document.querySelectorAll(".staff-memo-input").forEach((input) => {
+      input.addEventListener("change", async () => {
+        const group = input.closest(".staff-control-group");
+        const button = group ? group.querySelector(".staff-quantity-btn") : null;
+        if (!button) return;
+        const quantity = Number.parseInt(button.dataset.quantity || "0", 10);
+        const result = await updateStaffQuantity(button, quantity, input.value);
+        if (!result) input.value = button.dataset.memo || "";
       });
     });
     document.querySelectorAll(".staff-summary-btn").forEach((button) => {

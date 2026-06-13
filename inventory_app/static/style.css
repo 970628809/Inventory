@@ -128,6 +128,33 @@ td.stock-table-staff small {
   padding: 0.125rem 0.4rem;
 }
 
+.staff-control-group {
+  align-items: center;
+  display: flex;
+  gap: 0.25rem;
+  justify-content: center;
+}
+
+.staff-memo-input {
+  max-width: 9rem;
+  min-width: 7rem;
+}
+
+.my-staff-maker {
+  max-width: 6.25rem;
+  width: 6.25rem;
+}
+
+td.my-staff-maker strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.my-staff-table .stock-table-staff {
+  max-width: 15rem;
+  width: 15rem;
+}
+
 .stock-table-notes {
   max-width: 8.5rem;
   width: 8.5rem;
