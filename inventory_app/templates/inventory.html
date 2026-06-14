@@ -4,11 +4,6 @@
     <h1 class="mb-0">在庫一覧</h1>
     {% if can_manage_inventory %}
       <div class="d-flex gap-2">
-        {% if edit_mode %}
-          <a href="{{ url_for('inventory', q=params.q, sku=params.sku, big_category=params.big_category, supplier=params.supplier) }}" class="btn btn-outline-secondary">修正終了</a>
-        {% else %}
-          <a href="{{ url_for('inventory', edit=1, q=params.q, sku=params.sku, big_category=params.big_category, supplier=params.supplier) }}" class="btn btn-inventory-edit">在庫修正</a>
-        {% endif %}
         <a href="{{ url_for('inventory_new') }}" class="btn btn-primary">新品追加</a>
       </div>
     {% endif %}
@@ -17,9 +12,9 @@
   <!-- 大分類フィルタボタン -->
   <div class="mb-3">
     <div class="btn-group" role="group">
-      <a href="{{ url_for('inventory', edit=1 if edit_mode else none) }}" class="btn btn-sm {% if not params.big_category %}btn-primary{% else %}btn-outline-primary{% endif %}">すべて</a>
+      <a href="{{ url_for('inventory') }}" class="btn btn-sm {% if not params.big_category %}btn-primary{% else %}btn-outline-primary{% endif %}">すべて</a>
       {% for category in big_categories %}
-        <a href="{{ url_for('inventory', edit=1 if edit_mode else none, big_category=category, q=params.q, sku=params.sku, supplier=params.supplier) }}" class="btn btn-sm {% if params.big_category == category %}btn-primary{% else %}btn-outline-primary{% endif %}">{{ category }}</a>
+        <a href="{{ url_for('inventory', big_category=category, q=params.q, sku=params.sku, supplier=params.supplier) }}" class="btn btn-sm {% if params.big_category == category %}btn-primary{% else %}btn-outline-primary{% endif %}">{{ category }}</a>
       {% endfor %}
     </div>
   </div>
@@ -41,9 +36,6 @@
     <div class="col-md-2">
       {% if params.big_category %}
         <input type="hidden" name="big_category" value="{{ params.big_category }}">
-      {% endif %}
-      {% if edit_mode %}
-        <input type="hidden" name="edit" value="1">
       {% endif %}
       <button type="submit" class="btn btn-primary w-100">検索</button>
     </div>
@@ -110,14 +102,11 @@
             <td class="stock-table-notes"><small>{{ product.notes }}</small></td>
             {% if can_manage_inventory %}
               <td class="stock-table-actions-col">
-                {% if edit_mode %}
-                  <a href="{{ url_for('inventory_edit', product_id=product.id) }}" class="btn btn-sm btn-outline-warning w-100" title="修正">修正</a>
-                {% else %}
-                  <div class="inventory-actions" role="group">
-                    <a href="{{ url_for('stock_operate', product_id=product.id, type='inbound') }}" class="btn btn-sm btn-success" title="入庫">入庫</a>
-                    <a href="{{ url_for('stock_operate', product_id=product.id, type='outbound') }}" class="btn btn-sm btn-danger" title="出庫">出庫</a>
-                  </div>
-                {% endif %}
+                <div class="inventory-actions" role="group">
+                  <a href="{{ url_for('stock_operate', product_id=product.id, type='inbound') }}" class="btn btn-sm btn-success" title="入庫">入庫</a>
+                  <a href="{{ url_for('stock_operate', product_id=product.id, type='outbound') }}" class="btn btn-sm btn-danger" title="出庫">出庫</a>
+                  <a href="{{ url_for('inventory_edit', product_id=product.id) }}" class="btn btn-sm btn-outline-warning" title="情報修正">情報修正</a>
+                </div>
               </td>
             {% endif %}
           </tr>

@@ -679,6 +679,7 @@ PRODUCT_SNAPSHOT_FIELDS = [
     "current_stock",
     "total_stock",
     "staff_stock_json",
+    "staff_memo_json",
     "notes",
     "name",
     "category",
@@ -1391,7 +1392,6 @@ def edit_stock_log(log_id):
 @login_required
 def inventory():
     params = parse_search_args()
-    edit_mode = request.args.get("edit") == "1"
     sql, values = build_product_query(params)
     conn = get_db_connection()
     products = conn.execute(sql, values).fetchall()
@@ -1408,7 +1408,6 @@ def inventory():
         products=products,
         params=params,
         big_categories=big_categories,
-        edit_mode=edit_mode,
     )
 
 
@@ -1437,7 +1436,11 @@ def inventory_new():
         notes = request.form.get("notes", "").strip()
         source_sheet = request.form.get("source_sheet", "").strip() or "手動追加"
         staff_stock = parse_staff_stock_form()
-        staff_rows = staff_stock_form_rows(json.dumps(staff_stock, ensure_ascii=False))
+        staff_memos = parse_staff_memo_form()
+        staff_rows = staff_stock_form_rows(
+            json.dumps(staff_stock, ensure_ascii=False),
+            json.dumps(staff_memos, ensure_ascii=False),
+        )
 
         if not big_category:
             error_message = "大分類を入力してください。"
@@ -1477,7 +1480,7 @@ def inventory_new():
                     total_stock,
                     0,
                     json.dumps(staff_stock, ensure_ascii=False),
-                    "{}",
+                    json.dumps(staff_memos, ensure_ascii=False),
                     notes,
                     now,
                     available_stock,
@@ -1672,7 +1675,7 @@ def inventory_edit(product_id):
     options = get_inventory_form_options(conn)
     error_message = None
     form_data = dict(product)
-    staff_rows = staff_stock_form_rows(product["staff_stock_json"])
+    staff_rows = staff_stock_form_rows(product["staff_stock_json"], product["staff_memo_json"])
 
     if request.method == "POST":
         form_data = request.form.to_dict()
@@ -1690,7 +1693,11 @@ def inventory_edit(product_id):
         notes = request.form.get("notes", "").strip()
         source_sheet = request.form.get("source_sheet", "").strip() or "手動追加"
         staff_stock = parse_staff_stock_form()
-        staff_rows = staff_stock_form_rows(json.dumps(staff_stock, ensure_ascii=False))
+        staff_memos = parse_staff_memo_form()
+        staff_rows = staff_stock_form_rows(
+            json.dumps(staff_stock, ensure_ascii=False),
+            json.dumps(staff_memos, ensure_ascii=False),
+        )
 
         if not big_category:
             error_message = "大分類を入力してください。"
@@ -1727,6 +1734,7 @@ def inventory_edit(product_id):
                 "current_stock": available_stock,
                 "total_stock": total_stock,
                 "staff_stock_json": json.dumps(staff_stock, ensure_ascii=False),
+                "staff_memo_json": json.dumps(staff_memos, ensure_ascii=False),
                 "notes": notes,
                 "source_sheet": source_sheet,
                 "name": product_name,
@@ -1738,7 +1746,7 @@ def inventory_edit(product_id):
                 SET big_category = ?, maker_or_product = ?, overview = ?, supplier = ?,
                     amount = ?, wholesale_price = ?, tax_excluded_price = ?, tax_included_price = ?,
                     display_flag = ?, sku = ?, available_stock = ?, current_stock = ?,
-                    total_stock = ?, staff_stock_json = ?, notes = ?, source_sheet = ?,
+                    total_stock = ?, staff_stock_json = ?, staff_memo_json = ?, notes = ?, source_sheet = ?,
                     name = ?, category = ?, updated_at = ?
                 WHERE id = ?
                 """,
@@ -1757,6 +1765,7 @@ def inventory_edit(product_id):
                     available_stock,
                     total_stock,
                     json.dumps(staff_stock, ensure_ascii=False),
+                    json.dumps(staff_memos, ensure_ascii=False),
                     notes,
                     source_sheet,
                     product_name,
@@ -1772,7 +1781,7 @@ def inventory_edit(product_id):
                     "modification",
                     stock_change,
                     "",
-                    "在庫修正",
+                    "情報修正",
                     now,
                     json.dumps(
                         {
@@ -1787,12 +1796,12 @@ def inventory_edit(product_id):
             conn.commit()
             conn.close()
             flash("在庫情報を更新しました。", "success")
-            return redirect(url_for("inventory", edit="1"))
+            return redirect(url_for("inventory"))
 
     conn.close()
     return render_template(
         "inventory_new.html",
-        title="在庫修正",
+        title="情報修正",
         submit_label="更新する",
         options=options,
         error_message=error_message,

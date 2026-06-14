@@ -43,18 +43,6 @@ body {
   min-height: 100px;
 }
 
-.btn-inventory-edit {
-  --bs-btn-bg: #f0ad00;
-  --bs-btn-border-color: #f0ad00;
-  --bs-btn-color: #fff;
-  --bs-btn-hover-bg: #d99b00;
-  --bs-btn-hover-border-color: #d99b00;
-  --bs-btn-hover-color: #fff;
-  --bs-btn-active-bg: #c88f00;
-  --bs-btn-active-border-color: #c88f00;
-  --bs-btn-active-color: #fff;
-}
-
 .stocktaking-actions {
   display: inline-grid;
   grid-template-columns: repeat(2, 4rem);
@@ -197,13 +185,13 @@ td.stock-table-notes small {
 }
 
 .stock-table-actions-col {
-  min-width: 9rem;
-  width: 9rem;
+  min-width: 14rem;
+  width: 14rem;
 }
 
 .inventory-actions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(4rem, 1fr));
+  grid-template-columns: repeat(3, minmax(4rem, 1fr));
   gap: 0.25rem;
 }
 
