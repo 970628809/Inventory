@@ -195,6 +195,23 @@ td.stock-table-notes small {
   gap: 0.25rem;
 }
 
+.inventory-actions .btn {
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.btn-info-edit {
+  --bs-btn-bg: #f0ad00;
+  --bs-btn-border-color: #f0ad00;
+  --bs-btn-color: #fff;
+  --bs-btn-hover-bg: #d99b00;
+  --bs-btn-hover-border-color: #d99b00;
+  --bs-btn-hover-color: #fff;
+  --bs-btn-active-bg: #c88f00;
+  --bs-btn-active-border-color: #c88f00;
+  --bs-btn-active-color: #fff;
+}
+
 @media (max-width: 767.98px) {
   .navbar .container-fluid {
     align-items: flex-start;
