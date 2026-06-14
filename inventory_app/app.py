@@ -786,7 +786,7 @@ def parse_inventory_row(sheet, sheet_name, row):
         sku = str(get_cell(sheet, row, 6)).strip()
         display_flag = str(get_cell(sheet, row, 7)).strip()
         available_stock = parse_int(get_cell(sheet, row, 8))
-        supplier = ""
+        supplier = str(get_cell(sheet, row, 28)).strip()
         wholesale_price = str(get_cell(sheet, row, 9)).strip()
         tax_excluded_price = str(get_cell(sheet, row, 10)).strip()
         tax_included_price = str(get_cell(sheet, row, 11)).strip()
