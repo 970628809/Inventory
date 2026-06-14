@@ -128,20 +128,20 @@ td.stock-table-staff small {
 }
 
 .stock-table-tax-included {
-  background-color: rgba(255, 193, 7, 0.22) !important;
+  border-color: #f59f00 !important;
 }
 
 td.stock-table-tax-included small {
-  color: #9a5b00;
+  color: #f59f00;
   font-weight: 700;
 }
 
 .stock-table-available-highlight {
-  background-color: rgba(25, 135, 84, 0.18) !important;
+  border-color: #2f9e44 !important;
 }
 
 td.stock-table-available-highlight strong {
-  color: #087f5b;
+  color: #2f9e44;
   font-size: 1.05rem;
 }
 
