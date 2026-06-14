@@ -131,19 +131,15 @@ td.stock-table-tax-included small {
   color: #f59f00;
   display: inline-block;
   font-weight: 700;
-  transition: text-shadow 0.15s ease, transform 0.15s ease;
+  text-shadow: 0 2px 6px rgba(245, 159, 0, 0.22);
+  transform: translateY(-1px);
 }
 
 td.stock-table-available-highlight strong {
   color: #2f9e44;
   display: inline-block;
   font-size: 1.05rem;
-  transition: text-shadow 0.15s ease, transform 0.15s ease;
-}
-
-td.stock-table-tax-included:hover small,
-td.stock-table-available-highlight:hover strong {
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  text-shadow: 0 2px 6px rgba(47, 158, 68, 0.22);
   transform: translateY(-1px);
 }
 
