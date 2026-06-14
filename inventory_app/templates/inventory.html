@@ -60,8 +60,8 @@
           <th class="stock-table-sku">品番</th>
           <th class="text-center stock-table-price stock-table-wholesale">卸価格(税抜)</th>
           <th class="text-center stock-table-price">税別価格</th>
-          <th class="text-center stock-table-price">税込価格</th>
-          <th class="text-center stock-table-available">販売可能台数</th>
+          <th class="text-center stock-table-price stock-table-tax-included">税込価格</th>
+          <th class="text-center stock-table-available stock-table-available-highlight">販売可能台数</th>
           <th class="text-center">総台数</th>
           <th class="stock-table-staff">{{ '担当者別台数' if is_admin else '担当数量' }}</th>
           <th class="stock-table-notes">備考</th>
@@ -92,8 +92,8 @@
             <td class="stock-table-sku"><code>{{ product.sku }}</code></td>
             <td class="text-center stock-table-price stock-table-wholesale"><small>{{ product.wholesale_price }}</small></td>
             <td class="text-center stock-table-price"><small>{{ product.tax_excluded_price }}</small></td>
-            <td class="text-center stock-table-price"><small>{{ product.tax_included_price }}</small></td>
-            <td class="text-center stock-table-available"><strong>{{ product.available_stock }}</strong></td>
+            <td class="text-center stock-table-price stock-table-tax-included"><small>{{ product.tax_included_price }}</small></td>
+            <td class="text-center stock-table-available stock-table-available-highlight"><strong>{{ product.available_stock }}</strong></td>
             <td class="text-center">{{ product.total_stock }}</td>
             <td class="stock-table-staff">
               {% if is_admin %}

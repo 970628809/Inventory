@@ -284,10 +284,27 @@ app.jinja_env.filters["format_staff_summary_text"] = format_staff_summary_text
 
 
 def format_staff_summary_display(staff_stock_json, staff_memo_json=None):
-    text = format_staff_summary_text(staff_stock_json, staff_memo_json)
-    if text == "-":
+    try:
+        staff_stock = json.loads(staff_stock_json or "{}")
+    except Exception:
+        staff_stock = {}
+    try:
+        staff_memos = json.loads(staff_memo_json or "{}")
+    except Exception:
+        staff_memos = {}
+
+    lines = []
+    for name, quantity in staff_stock.items():
+        quantity = parse_int(quantity)
+        if quantity == 0:
+            continue
+        memo = str(staff_memos.get(name, "") or "").strip()
+        lines.append(f'<span class="staff-summary-main">{escape(name)}: {escape(quantity)}</span>')
+        if memo:
+            lines.append(f'<span class="staff-summary-memo">{escape(memo)}</span>')
+    if not lines:
         return "-"
-    return Markup("<br>".join(escape(line) for line in text.splitlines()))
+    return Markup("<br>".join(lines))
 
 
 app.jinja_env.filters["format_staff_summary"] = format_staff_summary_display
