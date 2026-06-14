@@ -127,22 +127,24 @@ td.stock-table-staff small {
   color: #495057;
 }
 
-.stock-table-tax-included {
-  border-color: #f59f00 !important;
-}
-
 td.stock-table-tax-included small {
   color: #f59f00;
+  display: inline-block;
   font-weight: 700;
-}
-
-.stock-table-available-highlight {
-  border-color: #2f9e44 !important;
+  transition: text-shadow 0.15s ease, transform 0.15s ease;
 }
 
 td.stock-table-available-highlight strong {
   color: #2f9e44;
+  display: inline-block;
   font-size: 1.05rem;
+  transition: text-shadow 0.15s ease, transform 0.15s ease;
+}
+
+td.stock-table-tax-included:hover small,
+td.stock-table-available-highlight:hover strong {
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  transform: translateY(-1px);
 }
 
 .staff-quantity-btn {
