@@ -274,7 +274,9 @@ def format_staff_summary_text(staff_stock_json, staff_memo_json=None):
         if quantity == 0:
             continue
         memo = str(staff_memos.get(name, "") or "").strip()
-        lines.append(f"{name}: {quantity}" + (f" / {memo}" if memo else ""))
+        lines.append(f"{name}: {quantity}")
+        if memo:
+            lines.append(memo)
     return "\n".join(lines) if lines else "-"
 
 
