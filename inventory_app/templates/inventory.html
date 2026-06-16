@@ -79,9 +79,9 @@
           <tr class="{{ status_color }}">
             <td class="text-center"><span class="badge bg-primary">{{ product.big_category }}</span></td>
             <td><strong>{% if product.display_flag | is_store_display %}<span class="text-warning">★</span> {% endif %}{{ product.maker_or_product }}</strong></td>
-            <td class="stock-table-overview"><small>{{ product.overview }}</small></td>
-            <td class="stock-table-supplier"><small>{{ product.supplier }}</small></td>
-            <td class="stock-table-sku"><code>{{ product.sku }}</code></td>
+            <td class="stock-table-overview"><small class="expandable-cell" title="クリックで展開">{{ product.overview }}</small></td>
+            <td class="stock-table-supplier"><small class="expandable-cell" title="クリックで展開">{{ product.supplier }}</small></td>
+            <td class="stock-table-sku"><code class="expandable-cell" title="クリックで展開">{{ product.sku }}</code></td>
             <td class="text-center stock-table-price stock-table-wholesale"><small>{{ product.wholesale_price }}</small></td>
             <td class="text-center stock-table-price"><small>{{ product.tax_excluded_price }}</small></td>
             <td class="text-center stock-table-price stock-table-tax-included"><small>{{ product.tax_included_price }}</small></td>
@@ -89,17 +89,19 @@
             <td class="text-center">{{ product.total_stock }}</td>
             <td class="stock-table-staff">
               {% if is_admin %}
-                <small>{{ product.staff_stock_json | format_staff_summary(product.staff_memo_json) }}</small>
+                <small class="expandable-cell" title="クリックで展開">{{ product.staff_stock_json | format_staff_summary(product.staff_memo_json) }}</small>
               {% elif product.staff_stock_json | staff_has_key(current_user.username) %}
-                <button type="button" class="btn btn-sm btn-light staff-quantity-btn" data-product-id="{{ product.id }}" data-quantity="{{ product.staff_stock_json | staff_quantity_for(current_user.username) }}" data-memo="{{ product.staff_memo_json | staff_memo_for(current_user.username) | e }}">
-                  {{ product.staff_stock_json | staff_quantity_for(current_user.username) }}
-                </button>
-                <button type="button" class="btn btn-sm btn-secondary staff-summary-btn" data-staff-summary="{{ product.staff_stock_json | format_staff_summary_text(product.staff_memo_json) | e }}">他</button>
+                <div class="staff-control-group">
+                  <button type="button" class="btn btn-sm btn-light staff-quantity-btn" data-product-id="{{ product.id }}" data-quantity="{{ product.staff_stock_json | staff_quantity_for(current_user.username) }}" data-memo="{{ product.staff_memo_json | staff_memo_for(current_user.username) | e }}">
+                    {{ product.staff_stock_json | staff_quantity_for(current_user.username) }}
+                  </button>
+                  <button type="button" class="btn btn-sm btn-secondary staff-summary-btn" data-staff-summary="{{ product.staff_stock_json | format_staff_summary_text(product.staff_memo_json) | e }}">他</button>
+                </div>
               {% else %}
                 <small>-</small>
               {% endif %}
             </td>
-            <td class="stock-table-notes"><small>{{ product.notes }}</small></td>
+            <td class="stock-table-notes"><small class="expandable-cell" title="クリックで展開">{{ product.notes }}</small></td>
             {% if can_manage_inventory %}
               <td class="stock-table-actions-col">
                 <div class="inventory-actions" role="group">

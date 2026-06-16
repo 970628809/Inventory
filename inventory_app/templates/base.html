@@ -54,5 +54,12 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      document.addEventListener('click', function (event) {
+        const cell = event.target.closest('.expandable-cell');
+        if (!cell) return;
+        cell.classList.toggle('is-expanded');
+      });
+    </script>
   </body>
 </html>

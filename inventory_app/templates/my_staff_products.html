@@ -27,8 +27,8 @@
           <tr>
             <td class="text-center"><span class="badge bg-primary">{{ product.big_category }}</span></td>
             <td class="my-staff-maker"><strong>{% if product.display_flag | is_store_display %}<span class="text-warning">★</span> {% endif %}{{ product.maker_or_product }}</strong></td>
-            <td class="stock-table-overview"><small>{{ product.overview }}</small></td>
-            <td class="stock-table-sku"><code>{{ product.sku }}</code></td>
+            <td class="stock-table-overview"><small class="expandable-cell" title="クリックで展開">{{ product.overview }}</small></td>
+            <td class="stock-table-sku"><code class="expandable-cell" title="クリックで展開">{{ product.sku }}</code></td>
             <td class="text-center stock-table-available"><strong>{{ product.available_stock }}</strong></td>
             <td class="text-center stock-table-staff">
               <div class="staff-control-group">
@@ -39,7 +39,7 @@
                 <button type="button" class="btn btn-sm btn-secondary staff-summary-btn" data-staff-summary="{{ product.staff_stock_json | format_staff_summary_text(product.staff_memo_json) | e }}">他</button>
               </div>
             </td>
-            <td class="stock-table-notes"><small>{{ product.notes }}</small></td>
+            <td class="stock-table-notes"><small class="expandable-cell" title="クリックで展開">{{ product.notes }}</small></td>
           </tr>
         {% else %}
           <tr>

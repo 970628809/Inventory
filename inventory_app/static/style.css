@@ -60,8 +60,6 @@ body {
 
 td.stock-table-overview small {
   display: block;
-  max-height: 2.5rem;
-  overflow: hidden;
 }
 
 .stock-table-supplier {
@@ -93,6 +91,17 @@ td.stock-table-overview small {
 .stock-table-sku code,
 .stock-table-price small {
   overflow-wrap: anywhere;
+}
+
+.expandable-cell {
+  cursor: pointer;
+  display: block;
+  max-height: 2.5rem;
+  overflow: hidden;
+}
+
+.expandable-cell.is-expanded {
+  max-height: none;
 }
 
 .stock-table-staff {
@@ -144,6 +153,7 @@ td.stock-table-available-highlight strong {
 .staff-control-group {
   align-items: center;
   display: flex;
+  flex-wrap: wrap;
   gap: 0.25rem;
   justify-content: center;
 }
@@ -175,8 +185,6 @@ td.my-staff-maker strong {
 
 td.stock-table-notes small {
   display: block;
-  max-height: 2.5rem;
-  overflow: hidden;
 }
 
 .stock-table thead th {
