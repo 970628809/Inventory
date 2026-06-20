@@ -1123,10 +1123,6 @@ def alert_settings(alert_type):
     conn = get_db_connection()
 
     if request.method == "POST":
-        if g.user["role"] != "admin":
-            conn.close()
-            flash("管理者権限が必要です。", "danger")
-            return redirect(url_for("alert_settings", alert_type=alert_type, **params))
         action = request.form.get("action")
         product_id = request.form.get("product_id", type=int)
 
