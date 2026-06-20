@@ -98,6 +98,9 @@ td.stock-table-overview small {
   display: block;
   max-height: 2.5rem;
   overflow: hidden;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .expandable-cell.is-expanded {
