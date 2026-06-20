@@ -110,6 +110,9 @@
     <div class="col-12">
       <button type="submit" class="btn btn-primary">{{ submit_label or '追加する' }}</button>
       <a href="{{ url_for('inventory') }}" class="btn btn-outline-secondary">戻る</a>
+      {% if is_edit %}
+        <button type="submit" name="action" value="delete_product" class="btn btn-outline-danger ms-2" formnovalidate onclick="return confirm('この商品を削除します。関連する在庫変動記録とリマインダーも削除されます。よろしいですか？');">商品を削除</button>
+      {% endif %}
     </div>
   </form>
 {% endblock %}

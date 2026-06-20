@@ -1674,6 +1674,15 @@ def inventory_edit(product_id):
     staff_rows = staff_stock_form_rows(product["staff_stock_json"], product["staff_memo_json"])
 
     if request.method == "POST":
+        if request.form.get("action") == "delete_product":
+            for table in ["low_stock_alerts", "zero_stock_alerts", "stagnant_stock_alerts", "stock_logs"]:
+                conn.execute(f"DELETE FROM {table} WHERE product_id = ?", (product_id,))
+            conn.execute("DELETE FROM products WHERE id = ?", (product_id,))
+            conn.commit()
+            conn.close()
+            flash("商品を削除しました。", "success")
+            return redirect(url_for("inventory"))
+
         form_data = request.form.to_dict()
         big_category = request.form.get("big_category", "").strip()
         maker_or_product = request.form.get("maker_or_product", "").strip()
